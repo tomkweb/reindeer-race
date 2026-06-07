@@ -75,6 +75,8 @@ canvas{display:block;}
   <button data-cam="aerial">Aerial</button>
   <button data-cam="chase">Chase</button>
   <button data-cam="rail">Rail</button>
+  <button data-cam="headon">Head-On</button>
+  <button data-cam="infield">Infield</button>
   <button data-cam="finish">Finish</button>
 </div>
 
@@ -94,6 +96,8 @@ canvas{display:block;}
 (function(){
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
+// Elf jockey coat colours — alternating red/green, Rudolph in blue (red clashes with his nose)
+const ELF_COLORS=['#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#1976d2'];
 const N=9, TRACK_LEN=185, FINISH_Z=172, START_Z=5, LANE_W=2.5, BASE_SPEED=3.0;
 
 let scene,camera,renderer,clock;
@@ -225,6 +229,71 @@ function buildSnow(){
   scene.add(new THREE.Points(snowGeo,new THREE.PointsMaterial({color:0xffffff,size:.5,transparent:true,opacity:.8,depthWrite:false})));
 }
 
+/* ── ELF JOCKEY (built from primitives) ─────────────── */
+function makeElf(coatColor){
+  const g=new THREE.Group();
+  const skin =new THREE.MeshStandardMaterial({color:0xf3c894,roughness:.7});
+  const coat =new THREE.MeshStandardMaterial({color:coatColor,roughness:.7});
+  const pants=new THREE.MeshStandardMaterial({color:0x2a4d3a,roughness:.7});
+  const boot =new THREE.MeshStandardMaterial({color:0x2a1a0a,roughness:.8});
+  const gold =new THREE.MeshStandardMaterial({color:0xd9a233,roughness:.4,metalness:.4});
+  const white=new THREE.MeshStandardMaterial({color:0xffffff,roughness:.6});
+  const dark =new THREE.MeshStandardMaterial({color:0x111111});
+
+  // Torso
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.20,0.4,10),coat);
+  body.castShadow=true; g.add(body);
+  // Belt + buckle
+  const belt=new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.18,0.05,12),boot);
+  belt.position.y=-0.18; g.add(belt);
+  const buckle=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.05,0.01),gold);
+  buckle.position.set(0,-0.18,0.18); g.add(buckle);
+  // Head
+  const head=new THREE.Mesh(new THREE.SphereGeometry(0.13,12,10),skin);
+  head.position.y=0.32; head.castShadow=true; g.add(head);
+  // Eyes + nose
+  [-0.045,0.045].forEach(x=>{
+    const e=new THREE.Mesh(new THREE.SphereGeometry(0.018,6,6),dark);
+    e.position.set(x,0.34,0.115); g.add(e);
+  });
+  const nose=new THREE.Mesh(new THREE.SphereGeometry(0.022,6,6),skin);
+  nose.position.set(0,0.31,0.125); g.add(nose);
+  // Pointed ears
+  [-1,1].forEach(s=>{
+    const ear=new THREE.Mesh(new THREE.ConeGeometry(0.035,0.12,5),skin);
+    ear.position.set(s*0.13,0.34,-0.01);
+    ear.rotation.z=s*Math.PI/2.2; g.add(ear);
+  });
+  // Hat — bent forward at tip, white band, pompom
+  const hat=new THREE.Mesh(new THREE.ConeGeometry(0.15,0.4,12),coat);
+  hat.position.y=0.65; hat.rotation.x=-0.18; hat.castShadow=true; g.add(hat);
+  const band=new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,0.05,12),white);
+  band.position.y=0.47; g.add(band);
+  const pom=new THREE.Mesh(new THREE.SphereGeometry(0.055,8,8),white);
+  pom.position.set(0.06,0.86,0.06); g.add(pom);
+  // Arms forward (reins)
+  [-1,1].forEach(s=>{
+    const pivot=new THREE.Group();
+    pivot.position.set(s*0.18,0.05,0);
+    const arm=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.32,6),coat);
+    arm.position.y=-0.16; arm.castShadow=true; pivot.add(arm);
+    pivot.rotation.x=-0.95; g.add(pivot);
+    const hand=new THREE.Mesh(new THREE.SphereGeometry(0.045,8,8),skin);
+    hand.position.set(s*0.16,-0.05,0.28); g.add(hand);
+  });
+  // Legs splayed astride + boots
+  [-1,1].forEach(s=>{
+    const pivot=new THREE.Group();
+    pivot.position.set(s*0.12,-0.22,0);
+    const leg=new THREE.Mesh(new THREE.CylinderGeometry(0.055,0.05,0.35,7),pants);
+    leg.position.y=-0.175; leg.castShadow=true; pivot.add(leg);
+    pivot.rotation.z=s*0.45; g.add(pivot);
+    const b=new THREE.Mesh(new THREE.BoxGeometry(0.09,0.06,0.14),boot);
+    b.position.set(s*0.30,-0.55,0.02); g.add(b);
+  });
+  return g;
+}
+
 /* ── LOAD DEER ───────────────────────────────────────── */
 function loadAllDeer(){
   const loader=new THREE.GLTFLoader();
@@ -301,6 +370,14 @@ function onLoaded(gltf,idx){
   action.play(); action.paused=true;
   idleAction.play(); idleAction.paused=true;
 
+  // Find the back/spine bone so the elf rides + bounces with the gallop
+  let backBone=null;
+  gltf.scene.traverse(nd=>{ if(!backBone&&nd.name&&/back_0\d+$/i.test(nd.name)) backBone=nd; });
+  // Build elf jockey and add to world scene (tracked each frame)
+  const elf=makeElf(ELF_COLORS[idx]);
+  elf.scale.setScalar(2.2); // overall elf size — tune if too small/large
+  scene.add(elf);
+
   const lane=(idx-(N-1)/2)*LANE_W;
   gltf.scene.position.set(lane,0,START_Z);
   scene.add(gltf.scene);
@@ -308,6 +385,7 @@ function onLoaded(gltf,idx){
   deerObjs[idx]={
     group:gltf.scene, mixer, action, idleAction,
     noseGroup:gltf._noseG||null, headNode:gltf._headNode||null,
+    elf, backBone,
     lane, z:START_Z, speed:0, flyTimer:0,
     base:0, surgeF:0, surgeP:0, amp:0,
     place:0, finished:false, name:NAMES[idx]
@@ -419,19 +497,36 @@ function updateRace(dt){
     }
   });
 
-  // Track Rudolph's nose to his head in world space
+  // Track Rudolph's nose to his head in world space (with head's rotation)
   const rud=deerObjs[8];
   if(rud&&rud.noseGroup){
     if(rud.headNode){
       const wp=new THREE.Vector3();
+      const wq=new THREE.Quaternion();
       rud.headNode.getWorldPosition(wp);
-      rud.noseGroup.position.copy(wp);
-      rud.noseGroup.position.z+=0.7;   // forward toward snout tip — tune if needed
-      rud.noseGroup.position.y+=0.15;  // up out of jaw — tune if needed
+      rud.headNode.getWorldQuaternion(wq);
+      // Offset in head's LOCAL space — rotate by head quaternion so nose
+      // follows head turns side-to-side and up-down
+      const off=new THREE.Vector3(0, -0.20, 0.50); // x=0 centered, y=down toward nose pad, z=forward
+      off.applyQuaternion(wq);
+      rud.noseGroup.position.copy(wp).add(off);
     } else {
       rud.noseGroup.position.set(rud.lane, rud.group.position.y+3.4, rud.group.position.z+1.8);
     }
   }
+
+  // Ride the elves — track each deer's back bone in world space
+  const _v=new THREE.Vector3();
+  deerObjs.forEach(d=>{
+    if(!d||!d.elf) return;
+    if(d.backBone){
+      d.backBone.getWorldPosition(_v);
+      d.elf.position.copy(_v);
+      d.elf.position.y+=0.9; // sit on top of back — tune with elf scale
+    } else {
+      d.elf.position.set(d.lane, d.group.position.y+2.8, d.group.position.z+0.1);
+    }
+  });
 
   const ld=leaderDeer();
   if(ld) leaderEl.innerHTML=finishCounter>0
@@ -446,36 +541,103 @@ function updateRace(dt){
 /* ── CAMERA DIRECTOR ─────────────────────────────────── */
 function directCamera(dt){
   let mode=camMode;
+
   if(mode==='auto'){
-    autoCutTimer-=dt;
     const ld=leaderDeer();
-    if(ld&&ld.z>FINISH_Z-50) autoPick='finish';
-    else if(autoCutTimer<=0){
-      const pool=['aerial','chase','rail','aerial','chase','aerial'];
-      autoPick=pool[Math.floor(Math.random()*pool.length)];
-      autoCutTimer=3.0+Math.random()*2.5;
+    const ldZ=ld?ld.z:START_Z;
+    const progress=(ldZ-START_Z)/(FINISH_Z-START_Z); // 0..1
+
+    if(raceTime<3.5){
+      // PHASE 1 — Establishing: wide high aerial showing full starting field
+      autoPick='aerial_wide';
+
+    } else if(progress<0.15){
+      // PHASE 2 — Early running: aerial descends toward the pack
+      autoPick='aerial';
+
+    } else if(progress<0.72){
+      // PHASE 3 — Mid race: director cycles cameras, cuts every 3-5s
+      autoCutTimer-=dt;
+      if(autoCutTimer<=0){
+        // Weighted pool — aerial most common, infield adds drama
+        const pool=['aerial','chase','rail','infield','aerial','chase','aerial','infield','rail'];
+        // Avoid repeating same camera twice
+        let pick;
+        do { pick=pool[Math.floor(Math.random()*pool.length)]; } while(pick===autoPick);
+        autoPick=pick;
+        autoCutTimer=3.0+Math.random()*2.0;
+      }
+
+    } else if(progress<0.88){
+      // PHASE 4 — Final approach: head-on, horses charging the camera
+      if(autoPick!=='headon'){ autoPick='headon'; autoCutTimer=999; }
+
+    } else {
+      // PHASE 5 — Final stretch: rapid cuts between head-on and finish line
+      autoCutTimer-=dt;
+      if(autoCutTimer<=0){
+        autoPick=(autoPick==='finish')?'headon':'finish';
+        autoCutTimer=1.2+Math.random()*0.8; // fast broadcast cuts
+      }
     }
     mode=autoPick;
   }
-  const ld=leaderDeer(), pc=packCenter();
-  let tp=new THREE.Vector3(), ta=new THREE.Vector3();
 
-  if(mode==='aerial'){
-    tp.set(pc.x*.3,28,pc.z-28); ta.set(pc.x*.3,1.5,pc.z+14);
+  const ld=leaderDeer(), pc=packCenter();
+  const progress=racing?(ld.z-START_Z)/(FINISH_Z-START_Z):1;
+  let tp=new THREE.Vector3(), ta=new THREE.Vector3(), smooth=2.2;
+
+  if(mode==='aerial_wide'){
+    // High and far back — full field visible at the start line
+    tp.set(0, 48, START_Z-35);
+    ta.set(0, 0, START_Z+30);
+    camLabel.innerHTML='<span class="rec">●</span> WIDE — FULL FIELD';
+    smooth=1.5;
+
+  } else if(mode==='aerial'){
+    // Aerial descends as race progresses — high early, low and fast late
+    const h=38-progress*22; // 38m early, 16m near the end
+    tp.set(pc.x*.25, h, pc.z-30);
+    ta.set(pc.x*.25, 1.5, pc.z+16);
     camLabel.innerHTML='<span class="rec">●</span> AERIAL';
+
   } else if(mode==='chase'){
-    tp.set(ld.lane*.5,4.5,ld.z-10); ta.set(ld.lane*.4,2.0,ld.z+9);
+    // Behind the leader, low, locked on — feel the speed
+    tp.set(ld.lane*.5, 4.5, ld.z-10);
+    ta.set(ld.lane*.4, 2.5, ld.z+12);
     camLabel.innerHTML='<span class="rec">●</span> CHASE — '+ld.name.toUpperCase();
+
   } else if(mode==='rail'){
+    // Trackside eye-level, pack sweeps past left to right
     const s=pc.x>=0?-1:1;
-    tp.set(s*(N*LANE_W/2+11),3.5,pc.z+6); ta.set(pc.x,1.8,pc.z);
+    tp.set(s*(N*LANE_W/2+12), 3.2, pc.z+8);
+    ta.set(pc.x, 1.8, pc.z-4);
     camLabel.innerHTML='<span class="rec">●</span> RAIL CAM';
+    smooth=3.5;
+
+  } else if(mode==='infield'){
+    // Low inside the track — almost ground level, horses thunder past overhead
+    tp.set(pc.x*.3, 0.7, pc.z+5);
+    ta.set(pc.x*.3+4, 2.2, pc.z-8);
+    camLabel.innerHTML='<span class="rec">●</span> INFIELD';
+    smooth=3.5;
+
+  } else if(mode==='headon'){
+    // Ahead of the leader looking BACK — pack charges the camera
+    tp.set(pc.x*.2, 2.8, ld.z+38);
+    ta.set(pc.x*.2, 1.8, ld.z-8);
+    camLabel.innerHTML='<span class="rec">●</span> HEAD-ON';
+    smooth=1.8; // smooth follow as leader advances
+
   } else {
-    tp.set(N*LANE_W/2+7,4,FINISH_Z+14); ta.set(0,2,FINISH_Z-8);
+    // Finish line — side on, tight, photo-finish angle
+    tp.set(N*LANE_W/2+8, 3.2, FINISH_Z+10);
+    ta.set(0, 1.8, FINISH_Z-4);
     camLabel.innerHTML='<span class="rec">●</span> FINISH LINE';
+    smooth=4.0;
   }
-  const k=(mode==='finish'||mode==='rail')?3.5:2.0;
-  const a=1-Math.exp(-k*dt);
+
+  const a=1-Math.exp(-smooth*dt);
   camPos.lerp(tp,a); camAim.lerp(ta,a);
   camera.position.copy(camPos); camera.lookAt(camAim);
 }
