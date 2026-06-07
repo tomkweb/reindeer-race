@@ -16,12 +16,12 @@ canvas{display:block;}
 #leader{top:16px;right:18px;text-align:right;font-size:clamp(.85rem,1.5vw,1.2rem);font-weight:600;}
 #leader b{color:#f4c95d;}
 #timer{top:44px;right:18px;text-align:right;font-size:clamp(.7rem,1.2vw,1rem);color:#c6d2ec;font-variant-numeric:tabular-nums;}
-.camBar{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:.4rem;z-index:6;max-width:98vw;}
-.camBar button{
-  pointer-events:auto;cursor:pointer;border:none;font-family:'Fredoka';font-weight:600;
+.camBar{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);display:flex;flex-wrap:wrap;
+  justify-content:center;gap:.4rem;z-index:6;max-width:98vw;}
+.camBar button{pointer-events:auto;cursor:pointer;border:none;font-family:'Fredoka';font-weight:600;
   background:rgba(15,22,50,.75);color:#c6d2ec;border:1px solid rgba(255,255,255,.18);
-  padding:.4rem .85rem;border-radius:999px;font-size:clamp(.6rem,1.05vw,.88rem);backdrop-filter:blur(8px);transition:all .15s;
-}
+  padding:.4rem .85rem;border-radius:999px;font-size:clamp(.6rem,1.05vw,.88rem);
+  backdrop-filter:blur(8px);transition:all .15s;}
 .camBar button.active{background:#f4c95d;color:#1a1340;border-color:#f4c95d;}
 .overlay{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;
   background:radial-gradient(circle at center,rgba(13,21,48,.55),rgba(13,21,48,.90));backdrop-filter:blur(4px);}
@@ -30,10 +30,13 @@ canvas{display:block;}
 .card h1{font-family:'Luckiest Guy',cursive;font-size:clamp(2rem,5.5vw,4rem);line-height:1;
   text-shadow:0 3px 0 #e23b4e,0 0 30px rgba(127,168,255,.45);}
 .card h1 .g{color:#f4c95d;text-shadow:0 0 22px rgba(244,201,93,.8);}
-.card .sub{color:#c6d2ec;letter-spacing:.2em;text-transform:uppercase;font-size:clamp(.65rem,1.1vw,.9rem);margin:.6rem 0 .4rem;}
-.progress{width:220px;height:8px;background:rgba(255,255,255,.15);border-radius:4px;margin:.8rem auto 1.4rem;overflow:hidden;}
+.card .sub{color:#c6d2ec;letter-spacing:.2em;text-transform:uppercase;
+  font-size:clamp(.65rem,1.1vw,.9rem);margin:.6rem 0 .4rem;}
+.progress{width:220px;height:8px;background:rgba(255,255,255,.15);border-radius:4px;
+  margin:.8rem auto 1.4rem;overflow:hidden;}
 .progress .bar{height:100%;background:#f4c95d;border-radius:4px;transition:width .3s ease;width:0%;}
-.count{font-family:'Luckiest Guy',cursive;font-size:clamp(5rem,16vw,12rem);color:#f4c95d;text-shadow:0 0 40px rgba(244,201,93,.7),0 5px 0 #e23b4e;animation:pop .85s ease;}
+.count{font-family:'Luckiest Guy',cursive;font-size:clamp(5rem,16vw,12rem);color:#f4c95d;
+  text-shadow:0 0 40px rgba(244,201,93,.7),0 5px 0 #e23b4e;animation:pop .85s ease;}
 @keyframes pop{0%{transform:scale(.25);opacity:0;}40%{transform:scale(1.18);}100%{transform:scale(1);opacity:1;}}
 .bigBtn{font-family:'Luckiest Guy',cursive;cursor:pointer;border:none;color:#2a1209;
   background:linear-gradient(180deg,#f4c95d,#d9a233);padding:.75rem 2rem;
@@ -41,9 +44,12 @@ canvas{display:block;}
   box-shadow:0 6px 0 #8a6418,0 10px 22px rgba(0,0,0,.4);display:none;}
 .bigBtn:active{transform:translateY(4px);box-shadow:0 2px 0 #8a6418;}
 .resultCard{background:linear-gradient(180deg,#241a52,#141c3c);border:2px solid rgba(244,201,93,.45);
-  border-radius:20px;padding:clamp(1.2rem,3vw,2.2rem);width:min(540px,86vw);box-shadow:0 24px 60px rgba(0,0,0,.55);}
-.resultCard h2{font-family:'Luckiest Guy',cursive;color:#f4c95d;font-size:clamp(1.5rem,3.5vw,2.4rem);margin-bottom:.9rem;}
-.rrow{display:flex;align-items:center;gap:.6rem;padding:.28rem .15rem;border-bottom:1px solid rgba(255,255,255,.07);font-size:clamp(.8rem,1.4vw,1rem);}
+  border-radius:20px;padding:clamp(1.2rem,3vw,2.2rem);width:min(540px,86vw);
+  box-shadow:0 24px 60px rgba(0,0,0,.55);}
+.resultCard h2{font-family:'Luckiest Guy',cursive;color:#f4c95d;
+  font-size:clamp(1.5rem,3.5vw,2.4rem);margin-bottom:.9rem;}
+.rrow{display:flex;align-items:center;gap:.6rem;padding:.28rem .15rem;
+  border-bottom:1px solid rgba(255,255,255,.07);font-size:clamp(.8rem,1.4vw,1rem);}
 .rrow .pos{font-family:'Luckiest Guy',cursive;color:#f4c95d;width:2em;}
 .rrow .swatch{width:.85em;height:.85em;border-radius:3px;flex-shrink:0;}
 .rrow .nm{font-weight:600;color:#e9eefc;}
@@ -67,9 +73,9 @@ canvas{display:block;}
 <div class="overlay" id="overlay">
   <div class="card">
     <h1>The <span class="g">Reindeer</span> Dash</h1>
-    <p class="sub" id="subLine">9 runners · oval track · pure chaos</p>
+    <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
-    <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading reindeer… 0/9</div>
+    <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
     <button class="bigBtn" id="startBtn">Start Race</button>
   </div>
 </div>
@@ -83,262 +89,314 @@ const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a0
 const ELF_COLORS=['#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#1976d2'];
 const N=9, LANE_W=1.6, BASE_SPEED=3.0;
 
-// Oval track dimensions
-const STRAIGHT=88;       // length of each straight in metres
-const TURN_R=32;         // turn radius in metres
-const OVAL_W=14;         // total track width (deer lanes)
-const OVAL_CIRC=2*STRAIGHT+2*Math.PI*TURN_R; // ~377m per lap
-// Oval centre in world space: (0, 0, STRAIGHT/2)
-const OC_X=0, OC_Z=STRAIGHT/2;
+// ── OVAL TRACK GEOMETRY (analytical – no Three.js curve dependency) ──────────
+// Layout: homestretch on right (X=+R), backstretch on left (X=-R)
+// Horses run counterclockwise viewed from above.
+const STR  = 80;                        // straight length (m)
+const TR   = 30;                        // turn radius (m)
+const CIRC = 2*STR + 2*Math.PI*TR;     // full lap ~349 m
+const TW   = 14;                        // track width (m)
 
-let trackCurve;          // CatmullRomCurve3, built in init
-let scene,camera,renderer,clock;
+// Segment arc-length boundaries
+const S1 = STR;                         // end of homestretch
+const S2 = STR + Math.PI*TR;           // end of top turn
+const S3 = 2*STR + Math.PI*TR;         // end of backstretch
+const S4 = CIRC;                        // end of bottom turn
+
+/**
+ * Returns {x, z, ry} for a deer at fractional lap progress p (0..1)
+ * with laneOff metres to the right of the centreline.
+ */
+function trackPos(p, laneOff){
+  const u  = ((p % 1) + 1) % 1;
+  const d  = u * CIRC;   // distance along track (m)
+  let px, pz, tx, tz;    // centre-line position & unit tangent
+
+  if(d < S1){
+    // Homestretch: X = +TR, Z increases 0 → STR
+    const t = d / STR;
+    px = TR;  pz = t * STR;
+    tx = 0;   tz = 1;
+
+  } else if(d < S2){
+    // Top turn: semicircle centred at (0, 0, STR), angle 0 → π
+    const a = (d - S1) / (Math.PI * TR);   // 0..1
+    const ang = a * Math.PI;
+    px = Math.cos(ang) * TR;
+    pz = STR + Math.sin(ang) * TR;
+    tx = -Math.sin(ang);   // tangent dx/d(ang) (normalised)
+    tz =  Math.cos(ang);
+
+  } else if(d < S3){
+    // Backstretch: X = -TR, Z decreases STR → 0
+    const t = (d - S2) / STR;
+    px = -TR;  pz = STR - t * STR;
+    tx = 0;    tz = -1;
+
+  } else {
+    // Bottom turn: semicircle centred at (0, 0, 0), angle π → 2π
+    const a = (d - S3) / (Math.PI * TR);   // 0..1
+    const ang = Math.PI + a * Math.PI;
+    px = Math.cos(ang) * TR;
+    pz = Math.sin(ang) * TR;
+    tx = -Math.sin(ang);
+    tz =  Math.cos(ang);
+  }
+
+  // Right normal = (tz, 0, -tx)  →  positive laneOff moves outward
+  return {
+    x  : px + tz * laneOff,
+    z  : pz - tx * laneOff,
+    ry : Math.atan2(tx, tz)   // deer faces direction of travel
+  };
+}
+
+// Track centre for camera maths
+const TC_X = 0, TC_Z = STR / 2;
+
+// ── ENGINE GLOBALS ────────────────────────────────────────────────────────────
+let scene, camera, renderer, clock;
 let deerObjs=new Array(N).fill(null), deerLoaded=0, deerScale=1, autoScaleDone=false;
 let racing=false, raceTime=0, finishCounter=0, finishedAll=false, postTimer=0;
-let camMode='auto', autoPick='aerial_wide', autoCutTimer=0;
-const camPos=new THREE.Vector3(OC_X,55,OC_Z-60), camAim=new THREE.Vector3(OC_X,0,OC_Z);
+let camMode='auto', autoPick='wide', autoCutTimer=0;
 let snowGeo;
+const camPos = new THREE.Vector3(TC_X, 55, TC_Z - 60);
+const camAim = new THREE.Vector3(TC_X, 0,  TC_Z);
 
-const overlay  =document.getElementById('overlay');
-const loadBar  =document.getElementById('loadBar');
-const loadMsg  =document.getElementById('loadMsg');
-const startBtn =document.getElementById('startBtn');
-const camLabel =document.getElementById('camLabel');
-const leaderEl =document.getElementById('leader');
-const timerEl  =document.getElementById('timer');
-document.getElementById('subLine').textContent=
-  '9 runners \u00b7 oval track \u00b7 pure chaos \u00b7 '+VERSION;
+const overlay   = document.getElementById('overlay');
+const loadBar   = document.getElementById('loadBar');
+const loadMsg   = document.getElementById('loadMsg');
+const startBtn  = document.getElementById('startBtn');
+const camLabel  = document.getElementById('camLabel');
+const leaderEl  = document.getElementById('leader');
+const timerEl   = document.getElementById('timer');
 
-/* ── BUILD OVAL TRACK CURVE ─────────────────────────── */
-function buildTrackCurve(){
-  const pts=[], nT=10; // points per turn
-  // Homestretch: X=+TURN_R, Z from 0 → STRAIGHT
-  pts.push(new THREE.Vector3(TURN_R,0,0));
-  pts.push(new THREE.Vector3(TURN_R,0,STRAIGHT*0.33));
-  pts.push(new THREE.Vector3(TURN_R,0,STRAIGHT*0.67));
-  pts.push(new THREE.Vector3(TURN_R,0,STRAIGHT));
-  // Top turn: sweep from X=+TURN_R to X=-TURN_R around (0,0,STRAIGHT)
-  for(let i=1;i<nT;i++){
-    const a=Math.PI*i/nT;
-    pts.push(new THREE.Vector3(Math.cos(a)*TURN_R,0,STRAIGHT+Math.sin(a)*TURN_R));
-  }
-  // Backstretch: X=-TURN_R, Z from STRAIGHT → 0
-  pts.push(new THREE.Vector3(-TURN_R,0,STRAIGHT));
-  pts.push(new THREE.Vector3(-TURN_R,0,STRAIGHT*0.67));
-  pts.push(new THREE.Vector3(-TURN_R,0,STRAIGHT*0.33));
-  pts.push(new THREE.Vector3(-TURN_R,0,0));
-  // Bottom turn: sweep from X=-TURN_R to X=+TURN_R around (0,0,0)
-  for(let i=1;i<nT;i++){
-    const a=Math.PI+Math.PI*i/nT;
-    pts.push(new THREE.Vector3(Math.cos(a)*TURN_R,0,Math.sin(a)*TURN_R));
-  }
-  trackCurve=new THREE.CatmullRomCurve3(pts,true,'catmullrom',0.5);
-}
-
-/* ── GET WORLD POSITION ON TRACK ────────────────────── */
-// progress 0..1 = one full lap. laneOff = metres right of centreline.
-function getTrackPos(progress,laneOff){
-  const u=((progress%1)+1)%1;
-  const p=trackCurve.getPointAt(u);
-  const t=trackCurve.getTangentAt(u);
-  // Right normal (90° clockwise in XZ): (t.z, 0, -t.x)
-  return{x:p.x+t.z*laneOff, z:p.z-t.x*laneOff, ry:Math.atan2(t.x,t.z)};
-}
-
-/* ── INIT ────────────────────────────────────────────── */
+// ── INIT ──────────────────────────────────────────────────────────────────────
 function init(){
-  buildTrackCurve();
-  scene=new THREE.Scene();
-  scene.background=new THREE.Color(0x8aadd4);
-  scene.fog=new THREE.Fog(0x8aadd4,60,260);
-  camera=new THREE.PerspectiveCamera(56,innerWidth/innerHeight,0.1,600);
+  scene  = new THREE.Scene();
+  scene.background = new THREE.Color(0x8aadd4);
+  scene.fog = new THREE.Fog(0x8aadd4, 60, 280);
+
+  camera = new THREE.PerspectiveCamera(54, innerWidth/innerHeight, 0.1, 600);
   camera.position.copy(camPos);
-  renderer=new THREE.WebGLRenderer({antialias:true});
-  renderer.setSize(innerWidth,innerHeight);
-  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-  renderer.outputEncoding=THREE.sRGBEncoding;
-  renderer.shadowMap.enabled=true;
-  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+
+  renderer = new THREE.WebGLRenderer({antialias: true});
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.outputEncoding  = THREE.sRGBEncoding;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type  = THREE.PCFSoftShadowMap;
   document.body.appendChild(renderer.domElement);
-  clock=new THREE.Clock();
-  // Lighting
-  scene.add(new THREE.HemisphereLight(0xd4eaff,0x6a7a90,0.9));
-  const sun=new THREE.DirectionalLight(0xfff0d6,1.3);
-  sun.position.set(-55,65,25); sun.castShadow=true;
-  sun.shadow.mapSize.set(1024,1024);
-  sun.shadow.camera.left=-100; sun.shadow.camera.right=100;
-  sun.shadow.camera.top=100;   sun.shadow.camera.bottom=-100;
-  sun.shadow.camera.near=1;    sun.shadow.camera.far=300;
+  clock = new THREE.Clock();
+
+  scene.add(new THREE.HemisphereLight(0xd4eaff, 0x6a7a90, 0.9));
+  const sun = new THREE.DirectionalLight(0xfff0d6, 1.3);
+  sun.position.set(-55, 65, 25);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.camera.left = -110; sun.shadow.camera.right  = 110;
+  sun.shadow.camera.top  =  110; sun.shadow.camera.bottom = -110;
+  sun.shadow.camera.near = 1;    sun.shadow.camera.far    = 300;
   scene.add(sun);
-  buildGround(); buildOvalTrack(); buildScenery(); buildSnow();
+
+  buildGround();
+  buildOvalTrack();
+  buildScenery();
+  buildSnow();
   loadAllDeer();
+
   document.querySelectorAll('.camBar button').forEach(b=>b.addEventListener('click',()=>{
-    camMode=b.dataset.cam;
+    camMode = b.dataset.cam;
     document.querySelectorAll('.camBar button').forEach(x=>x.classList.remove('active'));
     b.classList.add('active');
   }));
-  startBtn.addEventListener('click',beginRace);
-  addEventListener('resize',()=>{
-    camera.aspect=innerWidth/innerHeight;
+  startBtn.addEventListener('click', beginRace);
+  addEventListener('resize', ()=>{
+    camera.aspect = innerWidth/innerHeight;
     camera.updateProjectionMatrix();
-    renderer.setSize(innerWidth,innerHeight);
+    renderer.setSize(innerWidth, innerHeight);
   });
   animate();
 }
 
-/* ── GROUND ─────────────────────────────────────────── */
+// ── GROUND ────────────────────────────────────────────────────────────────────
 function buildGround(){
-  const m=new THREE.MeshStandardMaterial({color:0xddeeff,roughness:.95});
-  const g=new THREE.Mesh(new THREE.PlaneGeometry(500,500),m);
-  g.rotation.x=-Math.PI/2; g.receiveShadow=true;
+  const g = new THREE.Mesh(
+    new THREE.PlaneGeometry(600, 600),
+    new THREE.MeshStandardMaterial({color: 0xddeeff, roughness: 0.95})
+  );
+  g.rotation.x = -Math.PI/2;
+  g.receiveShadow = true;
   scene.add(g);
 }
 
-/* ── OVAL TRACK VISUALS ─────────────────────────────── */
+// ── OVAL TRACK VISUAL ─────────────────────────────────────────────────────────
 function buildOvalTrack(){
-  const nSamples=120;
-  const hw=OVAL_W/2+1.5; // half-width to rail
-  const railMat=new THREE.MeshStandardMaterial({color:0xfafcff,roughness:.6});
-  const postMat=new THREE.MeshStandardMaterial({color:0xcc3344});
+  const railMat = new THREE.MeshStandardMaterial({color: 0xfafcff, roughness: 0.6});
+  const postMat = new THREE.MeshStandardMaterial({color: 0xcc3344});
+  const bannerMat = new THREE.MeshStandardMaterial({color: 0x155724});
+  const hw = TW/2 + 1.5;          // half-width to rail from centreline
+  const N_PTS = 180;               // sample resolution
 
-  // Build inner and outer rail curves
-  const inPts=[], outPts=[];
-  for(let i=0;i<=nSamples;i++){
-    const u=i/nSamples;
-    const p=trackCurve.getPointAt(u);
-    const t=trackCurve.getTangentAt(u);
-    inPts.push(new THREE.Vector3(p.x-t.z*hw,0.5,p.z+t.x*hw));
-    outPts.push(new THREE.Vector3(p.x+t.z*hw,0.5,p.z-t.x*hw));
+  // Generate inner and outer rail centreline points analytically
+  function railPoints(offset){
+    const pts = [];
+    for(let i = 0; i <= N_PTS; i++){
+      const sp = trackPos(i/N_PTS, offset);
+      pts.push(new THREE.Vector3(sp.x, 0.55, sp.z));
+    }
+    return pts;
   }
-  const inCurve =new THREE.CatmullRomCurve3(inPts,true);
-  const outCurve=new THREE.CatmullRomCurve3(outPts,true);
+  const inPts  = railPoints(-hw);
+  const outPts = railPoints( hw);
 
-  // Rail tubes
-  [inCurve,outCurve].forEach(c=>{
-    const rail=new THREE.Mesh(new THREE.TubeGeometry(c,120,.14,6,true),railMat);
-    rail.castShadow=true; scene.add(rail);
-  });
+  // Build closed TubeGeometry for each rail
+  function makeTube(pts){
+    const curve = new THREE.CatmullRomCurve3(pts, true);
+    const mesh  = new THREE.Mesh(
+      new THREE.TubeGeometry(curve, N_PTS, 0.14, 6, true),
+      railMat
+    );
+    mesh.castShadow = true;
+    return mesh;
+  }
+  scene.add(makeTube(inPts));
+  scene.add(makeTube(outPts));
 
-  // Fence posts every ~8m
-  const nPosts=48;
-  for(let i=0;i<nPosts;i++){
-    const u=i/nPosts;
-    const ip=inCurve.getPointAt(u);
-    const op=outCurve.getPointAt(u);
-    [ip,op].forEach(p=>{
-      const post=new THREE.Mesh(new THREE.CylinderGeometry(.15,.15,1.3,8),postMat);
-      post.position.set(p.x,.65,p.z);
+  // Fence posts
+  for(let i = 0; i < 52; i++){
+    const u = i/52;
+    [trackPos(u,-hw), trackPos(u,hw)].forEach(sp=>{
+      const post = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.15, 0.15, 1.3, 8),
+        postMat
+      );
+      post.position.set(sp.x, 0.65, sp.z);
       scene.add(post);
     });
   }
 
-  // Finish line gantry at progress=0 (homestretch, Z≈0)
-  const fp=trackCurve.getPointAt(0);
-  const ft=trackCurve.getTangentAt(0);
-  const fn=new THREE.Vector3(ft.z,0,-ft.x); // right normal
-  const poleMat=new THREE.MeshStandardMaterial({color:0xcc3344});
-  [-1,1].forEach(s=>{
-    const pole=new THREE.Mesh(new THREE.CylinderGeometry(.3,.3,9,10),poleMat);
-    pole.position.set(fp.x+fn.x*s*(hw+1),4.5,fp.z+fn.z*s*(hw+1));
+  // Finish-line gantry (at progress = 0, bottom of homestretch)
+  const fp = trackPos(0, 0);
+  const pi = trackPos(0, -hw-1);
+  const po = trackPos(0,  hw+1);
+  [pi, po].forEach(sp=>{
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.30, 0.30, 9, 10),
+      postMat
+    );
+    pole.position.set(sp.x, 4.5, sp.z);
     scene.add(pole);
   });
-  const banner=new THREE.Mesh(new THREE.BoxGeometry(OVAL_W+4,2,.25),
-    new THREE.MeshStandardMaterial({color:0x155724}));
-  banner.position.set(fp.x,8.5,fp.z);
-  banner.rotation.y=Math.atan2(fn.x,fn.z);
-  scene.add(banner);
-  // Checker stripe
-  const stripe=new THREE.Mesh(new THREE.BoxGeometry(.25,OVAL_W+4,.02),
-    new THREE.MeshStandardMaterial({color:0x111111}));
-  stripe.rotation.x=Math.PI/2;
-  stripe.rotation.z=Math.atan2(fn.x,fn.z);
-  stripe.position.set(fp.x,.02,fp.z);
+  const ban = new THREE.Mesh(new THREE.BoxGeometry(TW+4, 2, 0.25), bannerMat);
+  ban.position.set(fp.x, 8.5, fp.z);
+  // Banner faces perpendicular to the track tangent
+  ban.rotation.y = fp.ry - Math.PI/2;
+  scene.add(ban);
+
+  // Ground stripe at finish
+  const stripe = new THREE.Mesh(
+    new THREE.BoxGeometry(TW+4, 0.04, 1.0),
+    new THREE.MeshStandardMaterial({color: 0x111111})
+  );
+  stripe.rotation.y = fp.ry - Math.PI/2;
+  stripe.position.set(fp.x, 0.03, fp.z);
   scene.add(stripe);
 }
 
-/* ── SCENERY ─────────────────────────────────────────── */
-function makeTree(x,z,s){
-  const g=new THREE.Group();
-  const tM=new THREE.MeshStandardMaterial({color:0x5a3a22,roughness:.9});
-  const fM=new THREE.MeshStandardMaterial({color:0x2a6840,roughness:.85});
-  const cM=new THREE.MeshStandardMaterial({color:0xddeeff,roughness:.7});
-  const tr=new THREE.Mesh(new THREE.CylinderGeometry(.22*s,.3*s,1.5*s,7),tM);
+// ── SCENERY ───────────────────────────────────────────────────────────────────
+function makeTree(x, z, s){
+  const g = new THREE.Group();
+  const tM = new THREE.MeshStandardMaterial({color:0x5a3a22,roughness:.9});
+  const fM = new THREE.MeshStandardMaterial({color:0x2a6840,roughness:.85});
+  const cM = new THREE.MeshStandardMaterial({color:0xddeeff,roughness:.7});
+  const tr = new THREE.Mesh(new THREE.CylinderGeometry(.22*s,.3*s,1.5*s,7),tM);
   tr.position.y=.75*s; tr.castShadow=true; g.add(tr);
   for(let i=0;i<3;i++){
-    const c=new THREE.Mesh(new THREE.ConeGeometry((2-i*.45)*s,(2.2-i*.25)*s,9),fM);
-    c.position.y=(1.9+i*1.45)*s; c.castShadow=true; g.add(c);
-    const cap=new THREE.Mesh(new THREE.ConeGeometry((2.05-i*.45)*s,.45*s,9),cM);
+    const cone = new THREE.Mesh(new THREE.ConeGeometry((2-i*.45)*s,(2.2-i*.25)*s,9),fM);
+    cone.position.y=(1.9+i*1.45)*s; cone.castShadow=true; g.add(cone);
+    const cap = new THREE.Mesh(new THREE.ConeGeometry((2.05-i*.45)*s,.45*s,9),cM);
     cap.position.y=(2.7+i*1.45)*s; g.add(cap);
   }
-  g.position.set(x,0,z); return g;
+  g.position.set(x,0,z);
+  return g;
 }
 function buildScenery(){
-  // Trees outside the oval
-  const outerR=TURN_R+OVAL_W/2+4;
-  for(let i=0;i<48;i++){
-    const angle=Math.random()*Math.PI*2;
-    const r=outerR+8+Math.random()*55;
-    const x=OC_X+Math.cos(angle)*r;
-    const z=OC_Z+Math.sin(angle)*(r*(STRAIGHT/(2*TURN_R+STRAIGHT)*1.5+0.5));
-    scene.add(makeTree(x,z,.7+Math.random()*1.5));
+  const outerR = TR + TW/2 + 5;
+  for(let i=0;i<50;i++){
+    const ang = Math.random()*Math.PI*2;
+    const r   = outerR + 8 + Math.random()*55;
+    // Stretch the ellipse to match the oval shape
+    const x   = Math.cos(ang) * r;
+    const z   = TC_Z + Math.sin(ang) * r * 1.6;
+    scene.add(makeTree(x, z, 0.7+Math.random()*1.5));
   }
-  // Distant mountains
   for(let i=0;i<10;i++){
-    const m=new THREE.Mesh(new THREE.ConeGeometry(35+Math.random()*30,40+Math.random()*40,5),
-      new THREE.MeshStandardMaterial({color:0xb0c4de,roughness:1}));
-    m.position.set((Math.random()-.5)*400,0,OC_Z+(150+Math.random()*80)*(Math.random()<.5?1:-1));
+    const m = new THREE.Mesh(
+      new THREE.ConeGeometry(35+Math.random()*30, 40+Math.random()*40, 5),
+      new THREE.MeshStandardMaterial({color:0xb0c4de,roughness:1})
+    );
+    m.position.set(
+      (Math.random()-.5)*500,
+      0,
+      TC_Z + (160+Math.random()*80)*(Math.random()<.5?1:-1)
+    );
     scene.add(m);
   }
 }
 
-/* ── SNOW PARTICLES ─────────────────────────────────── */
+// ── SNOW ──────────────────────────────────────────────────────────────────────
 function buildSnow(){
-  snowGeo=new THREE.BufferGeometry();
-  const cnt=700,arr=new Float32Array(cnt*3);
+  snowGeo = new THREE.BufferGeometry();
+  const cnt=700, arr=new Float32Array(cnt*3);
   for(let i=0;i<cnt;i++){
-    arr[i*3]=(Math.random()-.5)*180;
-    arr[i*3+1]=Math.random()*65;
-    arr[i*3+2]=OC_Z+(Math.random()-.5)*200;
+    arr[i*3]   = (Math.random()-.5)*200;
+    arr[i*3+1] = Math.random()*65;
+    arr[i*3+2] = TC_Z + (Math.random()-.5)*220;
   }
-  snowGeo.setAttribute('position',new THREE.BufferAttribute(arr,3));
-  scene.add(new THREE.Points(snowGeo,new THREE.PointsMaterial(
-    {color:0xffffff,size:.5,transparent:true,opacity:.8,depthWrite:false})));
+  snowGeo.setAttribute('position', new THREE.BufferAttribute(arr,3));
+  scene.add(new THREE.Points(snowGeo,
+    new THREE.PointsMaterial({color:0xffffff,size:.5,transparent:true,opacity:.8,depthWrite:false})));
 }
 
-/* ── ELF JOCKEY ─────────────────────────────────────── */
+// ── ELF JOCKEY ────────────────────────────────────────────────────────────────
 function makeElf(coatColor){
-  const g=new THREE.Group();
-  const skin=new THREE.MeshStandardMaterial({color:0xf3c894,roughness:.7});
-  const coat=new THREE.MeshStandardMaterial({color:coatColor,roughness:.7});
+  const g = new THREE.Group();
+  const skin =new THREE.MeshStandardMaterial({color:0xf3c894,roughness:.7});
+  const coat =new THREE.MeshStandardMaterial({color:coatColor,roughness:.7});
   const pants=new THREE.MeshStandardMaterial({color:0x2a4d3a,roughness:.7});
-  const boot=new THREE.MeshStandardMaterial({color:0x2a1a0a,roughness:.8});
-  const gold=new THREE.MeshStandardMaterial({color:0xd9a233,roughness:.4,metalness:.4});
+  const boot =new THREE.MeshStandardMaterial({color:0x2a1a0a,roughness:.8});
+  const gold =new THREE.MeshStandardMaterial({color:0xd9a233,roughness:.4,metalness:.4});
   const white=new THREE.MeshStandardMaterial({color:0xffffff,roughness:.6});
-  const dark=new THREE.MeshStandardMaterial({color:0x111111});
+  const dark =new THREE.MeshStandardMaterial({color:0x111111});
+  // Torso + belt
   const body=new THREE.Mesh(new THREE.CylinderGeometry(.16,.20,.4,10),coat);
   body.castShadow=true; g.add(body);
   const belt=new THREE.Mesh(new THREE.CylinderGeometry(.18,.18,.05,12),boot);
   belt.position.y=-.18; g.add(belt);
   const buckle=new THREE.Mesh(new THREE.BoxGeometry(.07,.05,.01),gold);
   buckle.position.set(0,-.18,.18); g.add(buckle);
+  // Head + face
   const head=new THREE.Mesh(new THREE.SphereGeometry(.13,12,10),skin);
   head.position.y=.32; head.castShadow=true; g.add(head);
   [-0.045,0.045].forEach(x=>{
     const e=new THREE.Mesh(new THREE.SphereGeometry(.018,6,6),dark);
     e.position.set(x,.34,.115); g.add(e);
   });
-  const nose=new THREE.Mesh(new THREE.SphereGeometry(.022,6,6),skin);
-  nose.position.set(0,.31,.125); g.add(nose);
+  g.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(.022,6,6),skin),
+    {position:new THREE.Vector3(0,.31,.125)}));
   [-1,1].forEach(s=>{
     const ear=new THREE.Mesh(new THREE.ConeGeometry(.035,.12,5),skin);
     ear.position.set(s*.13,.34,-.01); ear.rotation.z=s*Math.PI/2.2; g.add(ear);
   });
+  // Hat
   const hat=new THREE.Mesh(new THREE.ConeGeometry(.15,.4,12),coat);
   hat.position.y=.65; hat.rotation.x=-.18; hat.castShadow=true; g.add(hat);
   const band=new THREE.Mesh(new THREE.CylinderGeometry(.15,.15,.05,12),white);
   band.position.y=.47; g.add(band);
   const pom=new THREE.Mesh(new THREE.SphereGeometry(.055,8,8),white);
   pom.position.set(.06,.86,.06); g.add(pom);
+  // Arms
   [-1,1].forEach(s=>{
     const pv=new THREE.Group();
     pv.position.set(s*.18,.05,0);
@@ -348,6 +406,7 @@ function makeElf(coatColor){
     const hand=new THREE.Mesh(new THREE.SphereGeometry(.045,8,8),skin);
     hand.position.set(s*.16,-.05,.28); g.add(hand);
   });
+  // Legs
   [-1,1].forEach(s=>{
     const lp=new THREE.Group();
     lp.position.set(s*.12,-.22,0);
@@ -360,350 +419,305 @@ function makeElf(coatColor){
   return g;
 }
 
-/* ── LOAD DEER ───────────────────────────────────────── */
+// ── LOAD DEER ─────────────────────────────────────────────────────────────────
+function normalizeClip(clip){
+  let minT=Infinity;
+  clip.tracks.forEach(tr=>{if(tr.times.length) minT=Math.min(minT,tr.times[0]);});
+  if(minT>0) clip.tracks.forEach(tr=>{for(let i=0;i<tr.times.length;i++) tr.times[i]-=minT;});
+  clip.resetDuration();
+  return clip;
+}
 function loadAllDeer(){
   const loader=new THREE.GLTFLoader();
   for(let i=0;i<N;i++){
-    (function(idx){ loader.load('./scene.gltf',gltf=>onLoaded(gltf,idx),null,
-      err=>console.error('Load error',idx,err)); })(i);
+    (function(idx){
+      loader.load('./scene.gltf', gltf=>onLoaded(gltf,idx), null,
+        err=>console.error('Deer load error',idx,err));
+    })(i);
   }
 }
-function normalizeClip(clip){
-  let minT=Infinity;
-  clip.tracks.forEach(tr=>{if(tr.times.length)minT=Math.min(minT,tr.times[0]);});
-  if(minT>0) clip.tracks.forEach(tr=>{for(let i=0;i<tr.times.length;i++)tr.times[i]-=minT;});
-  clip.resetDuration(); return clip;
-}
-function onLoaded(gltf,idx){
+function onLoaded(gltf, idx){
   if(!autoScaleDone){
     autoScaleDone=true;
     const box=new THREE.Box3().setFromObject(gltf.scene);
     const h=box.getSize(new THREE.Vector3()).y;
-    deerScale=h>0.01?4.0/h:0.01;
+    deerScale = h>0.01 ? 4.0/h : 0.01;
   }
   gltf.scene.scale.setScalar(deerScale);
+
+  // Colour tint
   const tint=new THREE.Color(COLORS[idx]);
   gltf.scene.traverse(n=>{
-    if(!n.isMesh)return;
+    if(!n.isMesh) return;
     const orig=Array.isArray(n.material)?n.material[0]:n.material;
     const mat=orig.clone();
-    const lum=mat.color.r+mat.color.g+mat.color.b;
-    if(lum>0.25)mat.color.multiply(tint);
+    if(mat.color.r+mat.color.g+mat.color.b>0.25) mat.color.multiply(tint);
     mat.roughness=0.75; mat.metalness=0.0;
     n.material=mat; n.castShadow=true; n.receiveShadow=true;
   });
-  // Rudolph red nose
+
+  // Rudolph's nose
+  let headNode=null, noseGroup=null;
   if(idx===8){
-    const noseMat=new THREE.MeshStandardMaterial(
+    const nm=new THREE.MeshStandardMaterial(
       {color:0xff2233,emissive:0xff1122,emissiveIntensity:2.5,roughness:.2});
-    const noseG=new THREE.Group();
-    noseG.add(new THREE.Mesh(new THREE.SphereGeometry(.28,14,14),noseMat));
-    noseG.add(new THREE.PointLight(0xff3344,3.0,8));
-    scene.add(noseG);
-    let headNode=null;
-    gltf.scene.traverse(nd=>{if(!headNode&&nd.name&&nd.name.toLowerCase().includes('head'))headNode=nd;});
-    gltf._noseG=noseG; gltf._headNode=headNode;
+    noseGroup=new THREE.Group();
+    noseGroup.add(new THREE.Mesh(new THREE.SphereGeometry(.28,14,14),nm));
+    noseGroup.add(new THREE.PointLight(0xff3344,3.0,8));
+    scene.add(noseGroup);
+    gltf.scene.traverse(nd=>{
+      if(!headNode&&nd.name&&nd.name.toLowerCase().includes('head')) headNode=nd;
+    });
   }
-  // Find back bone for elf
+
+  // Spine bone for elf seat
   let backBone=null;
-  gltf.scene.traverse(nd=>{if(!backBone&&nd.name&&/back_0\d+$/i.test(nd.name))backBone=nd;});
-  // Elf jockey
+  gltf.scene.traverse(nd=>{
+    if(!backBone&&nd.name&&/back_0\d+$/i.test(nd.name)) backBone=nd;
+  });
+
+  // Elf
   const elf=makeElf(ELF_COLORS[idx]);
   elf.scale.setScalar(2.2);
   scene.add(elf);
-  // Animations
-  const mixer=new THREE.AnimationMixer(gltf.scene);
-  const runClip =normalizeClip(THREE.AnimationClip.findByName(gltf.animations,'Rundeer'));
-  const idleClip=normalizeClip(THREE.AnimationClip.findByName(gltf.animations,'IdleDeer'));
-  const action    =mixer.clipAction(runClip);
-  const idleAction=mixer.clipAction(idleClip);
-  action.setLoop(THREE.LoopRepeat,Infinity);
-  action.play(); action.paused=true;
-  idleAction.play(); idleAction.paused=true;
 
-  // Initial placement at start line
+  // Animations
+  const mixer    =new THREE.AnimationMixer(gltf.scene);
+  const runClip  =normalizeClip(THREE.AnimationClip.findByName(gltf.animations,'Rundeer'));
+  const idleClip =normalizeClip(THREE.AnimationClip.findByName(gltf.animations,'IdleDeer'));
+  const action   =mixer.clipAction(runClip);
+  const idleAct  =mixer.clipAction(idleClip);
+  action.setLoop(THREE.LoopRepeat, Infinity);
+  action.play(); action.paused=true;
+  idleAct.play(); idleAct.paused=true;
+
   const laneOff=(idx-(N-1)/2)*LANE_W;
-  const sp=getTrackPos(0,laneOff);
-  gltf.scene.position.set(sp.x,0,sp.z);
+  const sp=trackPos(0, laneOff);
+  gltf.scene.position.set(sp.x, 0, sp.z);
   gltf.scene.rotation.y=sp.ry;
   scene.add(gltf.scene);
 
   deerObjs[idx]={
-    group:gltf.scene, mixer, action, idleAction,
-    noseGroup:gltf._noseG||null, headNode:gltf._headNode||null,
-    elf, backBone,
-    laneOff, progress:0, speed:0, flyTimer:0,
+    group:gltf.scene, mixer, action, idleAct,
+    noseGroup, headNode, elf, backBone,
+    laneOff, progress:0, speed:0,
     base:0, surgeF:0, surgeP:0, amp:0,
-    flightProgress:-1, flightMaxAlt:0, flightDuration:0, nextFlightAt:0,
+    flightProg:-1, flightDur:0, flightAlt:0, nextFlight:0,
     place:0, finished:false, name:NAMES[idx]
   };
+
   deerLoaded++;
   loadBar.style.width=(deerLoaded/N*100)+'%';
-  loadMsg.textContent='Loading reindeer\u2026 '+deerLoaded+'/9';
-  if(deerLoaded===N){loadMsg.textContent='Ready!';startBtn.style.display='block';}
+  loadMsg.textContent='Loading... '+deerLoaded+'/9';
+  if(deerLoaded===N){ loadMsg.textContent='Ready!'; startBtn.style.display='block'; }
 }
 
-/* ── RACE SETUP ──────────────────────────────────────── */
+// ── RACE SETUP ────────────────────────────────────────────────────────────────
 function configureRace(){
+  raceTime=0; finishCounter=0; finishedAll=false; postTimer=0;
   deerObjs.forEach(d=>{
-    if(!d)return;
+    if(!d) return;
     d.progress=0; d.place=0; d.finished=false;
-    d.flyTimer=0; d.flightProgress=-1;
-    d.nextFlightAt=2.5+Math.random()*4.0;
-    d.base=10.0+Math.random()*5.0; // faster for longer oval
-    d.surgeF=0.45+Math.random()*1.3;
-    d.surgeP=Math.random()*Math.PI*2;
-    d.amp=0.20+Math.random()*0.35;
-    d.speed=d.base;
-    const sp=getTrackPos(0,d.laneOff);
-    d.group.position.set(sp.x,0,sp.z);
+    d.flightProg=-1; d.nextFlight=2.5+Math.random()*4;
+    d.base   = 10 + Math.random()*5;
+    d.surgeF = 0.45 + Math.random()*1.3;
+    d.surgeP = Math.random()*Math.PI*2;
+    d.amp    = 0.20 + Math.random()*0.35;
+    d.speed  = d.base;
+    const sp=trackPos(0, d.laneOff);
+    d.group.position.set(sp.x, 0, sp.z);
     d.group.rotation.y=sp.ry;
-    d.idleAction.stop();
+    d.idleAct.stop();
     d.action.reset().play(); d.action.paused=false;
     d.mixer.setTime(Math.random()*2);
-    d.mixer.timeScale=1;
   });
 }
 function beginRace(){
-  configureRace(); raceTime=0; finishCounter=0; finishedAll=false; postTimer=0;
-  showCountdown(()=>{
-    racing=true;
-    overlay.classList.add('off');
-  });
+  configureRace();
+  showCountdown(()=>{ racing=true; overlay.classList.add('off'); });
 }
 function showCountdown(done){
   overlay.classList.remove('off');
   overlay.innerHTML='<div class="card"><div class="count" id="cnum">3</div></div>';
-  let count=document.getElementById('cnum');
-  const seq=['3','2','1','GO!'];
-  let i=0;
-  function step(){
+  let cnt=document.getElementById('cnum');
+  const seq=['3','2','1','GO!']; let i=0;
+  (function step(){
     if(i<seq.length){
-      count.textContent=seq[i];
-      count.style.animation='none'; void count.offsetWidth; count.style.animation='pop .85s ease';
+      cnt.textContent=seq[i];
+      cnt.style.animation='none'; void cnt.offsetWidth; cnt.style.animation='pop .85s ease';
       i++; setTimeout(step,750);
     } else { done(); }
-  }
-  setTimeout(step,300);
+  })();
 }
 
-/* ── RACE HELPERS ────────────────────────────────────── */
-function leaderDeer(){
-  let b=null;
-  deerObjs.forEach(d=>{if(d&&(!b||d.progress>b.progress))b=d;});
-  return b;
-}
-function packCenter(){
-  let x=0,z=0,n=0;
-  deerObjs.forEach(d=>{if(d){x+=d.group.position.x;z+=d.group.position.z;n++;}});
-  return{x:x/(n||1),z:z/(n||1)};
-}
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function leader(){ let b=null; deerObjs.forEach(d=>{ if(d&&(!b||d.progress>b.progress)) b=d; }); return b; }
+function packXZ(){ let x=0,z=0,n=0; deerObjs.forEach(d=>{ if(d){x+=d.group.position.x;z+=d.group.position.z;n++;} }); return{x:x/(n||1),z:z/(n||1)}; }
 
-/* ── RACE UPDATE ─────────────────────────────────────── */
+// ── UPDATE RACE ───────────────────────────────────────────────────────────────
 function updateRace(dt){
   raceTime+=dt;
   deerObjs.forEach(d=>{
-    if(!d)return;
+    if(!d) return;
     if(d.finished){
       d.group.position.y=0;
       d.mixer.timeScale=0.7; d.mixer.update(dt);
       return;
     }
-    const surge=1+d.amp*Math.sin(d.surgeF*raceTime+d.surgeP);
-    const jit=0.92+Math.random()*0.16;
-    d.speed=Math.max(2.0,d.base*surge*jit);
-    d.progress+=d.speed*dt/OVAL_CIRC;
+    // Speed
+    d.speed=Math.max(2, d.base*(1+d.amp*Math.sin(d.surgeF*raceTime+d.surgeP))*(0.92+Math.random()*.16));
+    d.progress += d.speed*dt/CIRC;
 
-    // Random brief flights
-    if(d.flightProgress<0){
-      if(raceTime>=d.nextFlightAt){
-        d.flightProgress=0;
-        d.flightDuration=1.4+Math.random()*2.0;
-        d.flightMaxAlt=2.0+Math.random()*5.0;
+    // Fly
+    if(d.flightProg<0){
+      if(raceTime>=d.nextFlight){
+        d.flightProg=0; d.flightDur=1.4+Math.random()*2; d.flightAlt=2+Math.random()*5;
       }
       d.group.position.y=0;
     } else {
-      d.flightProgress+=dt/d.flightDuration;
-      if(d.flightProgress>=1){
-        d.flightProgress=-1; d.group.position.y=0;
-        d.nextFlightAt=raceTime+1.5+Math.random()*4.0;
-      } else {
-        d.group.position.y=Math.sin(d.flightProgress*Math.PI)*d.flightMaxAlt;
-      }
+      d.flightProg+=dt/d.flightDur;
+      if(d.flightProg>=1){ d.flightProg=-1; d.group.position.y=0; d.nextFlight=raceTime+1.5+Math.random()*4; }
+      else { d.group.position.y=Math.sin(d.flightProg*Math.PI)*d.flightAlt; }
     }
 
-    // Position deer on oval
-    const sp=getTrackPos(d.progress,d.laneOff);
+    // Position on oval
+    const sp=trackPos(d.progress, d.laneOff);
     d.group.position.x=sp.x;
     d.group.position.z=sp.z;
     d.group.rotation.y=sp.ry;
-
     d.mixer.timeScale=1.5; d.mixer.update(dt);
 
+    // Finish
     if(d.progress>=1.0){
       d.finished=true; d.place=++finishCounter;
-      d.group.position.y=0; d.flightProgress=-1;
-      const fp=getTrackPos(1.0,d.laneOff);
+      d.group.position.y=0; d.flightProg=-1;
+      const fp=trackPos(1.0, d.laneOff);
       d.group.position.x=fp.x; d.group.position.z=fp.z; d.group.rotation.y=fp.ry;
-      d.idleAction.reset().play();
-      d.action.crossFadeTo(d.idleAction,.4,false);
+      d.idleAct.reset().play(); d.action.crossFadeTo(d.idleAct,.4,false);
     }
   });
 
-  // Rudolph nose tracking
+  // Rudolph nose
   const rud=deerObjs[8];
   if(rud&&rud.noseGroup){
     if(rud.headNode){
       const wp=new THREE.Vector3(), wq=new THREE.Quaternion();
-      rud.headNode.getWorldPosition(wp);
-      rud.headNode.getWorldQuaternion(wq);
-      const off=new THREE.Vector3(0,-0.20,0.50);
-      off.applyQuaternion(wq);
+      rud.headNode.getWorldPosition(wp); rud.headNode.getWorldQuaternion(wq);
+      const off=new THREE.Vector3(0,-0.20,0.50); off.applyQuaternion(wq);
       rud.noseGroup.position.copy(wp).add(off);
     } else {
-      rud.noseGroup.position.set(rud.group.position.x,rud.group.position.y+3.4,rud.group.position.z);
+      rud.noseGroup.position.set(rud.group.position.x, rud.group.position.y+3.4, rud.group.position.z);
     }
   }
 
-  // Elf jockey tracking
+  // Elf jockeys
   const _v=new THREE.Vector3();
   deerObjs.forEach(d=>{
-    if(!d||!d.elf)return;
-    if(d.backBone){
-      d.backBone.getWorldPosition(_v);
-      d.elf.position.copy(_v);
-      d.elf.position.y+=0.9;
-    } else {
-      d.elf.position.set(d.group.position.x,d.group.position.y+2.8,d.group.position.z);
-    }
-    d.elf.rotation.y=d.group.rotation.y; // face same direction as deer
+    if(!d||!d.elf) return;
+    if(d.backBone){ d.backBone.getWorldPosition(_v); d.elf.position.copy(_v); d.elf.position.y+=0.9; }
+    else { d.elf.position.set(d.group.position.x, d.group.position.y+2.8, d.group.position.z); }
+    d.elf.rotation.y=d.group.rotation.y;
   });
 
   // HUD
-  const ld=leaderDeer();
-  if(ld)leaderEl.innerHTML=finishCounter>0
+  const ld=leader();
+  if(ld) leaderEl.innerHTML=finishCounter>0
     ?'LEADER <b>'+(deerObjs.find(x=>x&&x.place===1)||ld).name.toUpperCase()+'</b>'
     :'LEADER <b>'+ld.name.toUpperCase()+'</b>';
   timerEl.textContent=raceTime.toFixed(1)+'s';
 
-  if(finishCounter>=N&&!finishedAll)finishedAll=true;
-  if(finishedAll){postTimer+=dt;if(postTimer>2.0){racing=false;showResults();}}
+  if(finishCounter>=N&&!finishedAll) finishedAll=true;
+  if(finishedAll){ postTimer+=dt; if(postTimer>2) { racing=false; showResults(); } }
 }
 
-/* ── BROADCAST CAMERA DIRECTOR ───────────────────────── */
+// ── CAMERA DIRECTOR ───────────────────────────────────────────────────────────
 function directCamera(dt){
   let mode=camMode;
   if(mode==='auto'){
-    const ld=leaderDeer();
+    const ld=leader();
     const prog=ld?ld.progress:0;
     if(raceTime<3.5){
-      autoPick='aerial_wide';
+      autoPick='wide';
     } else if(prog<0.12){
       autoPick='aerial';
     } else if(prog<0.72){
       autoCutTimer-=dt;
       if(autoCutTimer<=0){
-        const pool=['aerial','chase','rail','infield','turn','aerial','chase','aerial','turn','infield'];
-        let pick;
-        do{pick=pool[Math.floor(Math.random()*pool.length)];}while(pick===autoPick);
-        autoPick=pick;
-        autoCutTimer=3.0+Math.random()*2.0;
+        const pool=['aerial','chase','rail','infield','turn','aerial','chase','aerial','turn'];
+        let pick; do{ pick=pool[Math.floor(Math.random()*pool.length)]; }while(pick===autoPick);
+        autoPick=pick; autoCutTimer=3+Math.random()*2;
       }
     } else if(prog<0.88){
-      if(autoPick!=='headon'){autoPick='headon';autoCutTimer=999;}
+      if(autoPick!=='headon'){ autoPick='headon'; autoCutTimer=999; }
     } else {
       autoCutTimer-=dt;
-      if(autoCutTimer<=0){
-        autoPick=(autoPick==='finish')?'headon':'finish';
-        autoCutTimer=1.2+Math.random()*.8;
-      }
+      if(autoCutTimer<=0){ autoPick=autoPick==='finish'?'headon':'finish'; autoCutTimer=1.2+Math.random()*.8; }
     }
     mode=autoPick;
   }
 
-  const ld=leaderDeer(), pc=packCenter();
-  const ldProg=ld?ld.progress:0;
-  let tp=new THREE.Vector3(), ta=new THREE.Vector3(), smooth=2.2;
+  const ld=leader(), pc=packXZ();
+  const prog=ld?ld.progress:0;
+  let tp=new THREE.Vector3(), ta=new THREE.Vector3(), sm=2.2;
 
-  if(mode==='aerial_wide'){
-    // Full oval from high above — classic establishing shot
-    tp.set(OC_X,58,OC_Z-55);
-    ta.set(OC_X,0,OC_Z);
-    camLabel.innerHTML='<span class="rec">●</span> WIDE — FULL OVAL';
-    smooth=1.2;
+  if(mode==='wide'){
+    // Establishing shot — high and back, full oval visible
+    tp.set(TC_X, 62, TC_Z-65); ta.set(TC_X, 0, TC_Z);
+    camLabel.innerHTML='<span class="rec">●</span> WIDE — FULL OVAL'; sm=1.2;
 
   } else if(mode==='aerial'){
-    // Aerial descends as leader advances around the oval
-    const h=40-ldProg*22;
-    tp.set(pc.x*.2,Math.max(14,h),pc.z-30);
-    ta.set(pc.x*.2,1.5,pc.z+18);
+    const h=42-prog*24;
+    tp.set(pc.x*.2, Math.max(14,h), pc.z-32); ta.set(pc.x*.2, 1.5, pc.z+20);
     camLabel.innerHTML='<span class="rec">●</span> AERIAL';
 
   } else if(mode==='chase'){
-    // Tight behind leader
     if(ld){
-      const sp=getTrackPos(ld.progress-.025,ld.laneOff*.5);
-      tp.set(sp.x,5.0,sp.z);
-      ta.set(ld.group.position.x,2.5,ld.group.position.z);
+      const back=trackPos(ld.progress-0.03, ld.laneOff*.5);
+      tp.set(back.x, 5.0, back.z);
+      ta.set(ld.group.position.x, 2.5, ld.group.position.z);
     }
-    camLabel.innerHTML='<span class="rec">●</span> CHASE — '+(ld?ld.name.toUpperCase():'');
-    smooth=2.5;
+    camLabel.innerHTML='<span class="rec">●</span> CHASE — '+(ld?ld.name.toUpperCase():''); sm=2.5;
 
   } else if(mode==='rail'){
-    // Trackside, eye level — horses sweep past
-    const hw=OVAL_W/2+12;
-    const t=trackCurve.getTangentAt(((ldProg-.1)%1+1)%1);
-    const rn=new THREE.Vector3(t.z,0,-t.x);
-    const pp=trackCurve.getPointAt(((ldProg-.05)%1+1)%1);
-    tp.set(pp.x+rn.x*hw,3.2,pp.z+rn.z*hw);
-    ta.set(pc.x,1.8,pc.z);
-    camLabel.innerHTML='<span class="rec">●</span> RAIL CAM';
-    smooth=3.5;
+    // Trackside eye-level, pack sweeps past
+    const sp=trackPos((prog-.05+1)%1, -(TW/2+12));
+    tp.set(sp.x, 3.5, sp.z); ta.set(pc.x, 2.0, pc.z);
+    camLabel.innerHTML='<span class="rec">●</span> RAIL CAM'; sm=3.5;
 
   } else if(mode==='turn'){
-    // Inside the turn, looking at horses sweeping around — signature oval shot
-    const inTopTurn=ldProg>0.15&&ldProg<0.45;
-    const tcZ=inTopTurn?STRAIGHT:-TURN_R*.3;
-    const lookZ=inTopTurn?STRAIGHT+TURN_R*1.4:TURN_R*1.4;
-    tp.set(OC_X,3.5,tcZ);
-    ta.set(pc.x,2.0,inTopTurn?lookZ:OC_Z*.3);
-    camLabel.innerHTML='<span class="rec">●</span> TURN CAM';
-    smooth=2.0;
+    // Inside the turn apex looking at horses sweeping around — classic oval shot
+    const inTop=prog>0.15&&prog<0.50;
+    const cz=inTop?STR:0;
+    tp.set(TC_X, 4, cz); ta.set(pc.x, 2.0, pc.z);
+    camLabel.innerHTML='<span class="rec">●</span> TURN CAM'; sm=2.0;
 
   } else if(mode==='infield'){
-    // Low ground level inside oval — horses thunder past
-    tp.set(pc.x*.3,0.8,pc.z+6);
-    ta.set(pc.x*.3+5,2.5,pc.z-8);
-    camLabel.innerHTML='<span class="rec">●</span> INFIELD';
-    smooth=3.5;
+    // Low inside the oval, horses thunder past
+    tp.set(pc.x*.2, 0.9, pc.z+7); ta.set(pc.x*.2+5, 2.5, pc.z-8);
+    camLabel.innerHTML='<span class="rec">●</span> INFIELD'; sm=3.5;
 
   } else if(mode==='headon'){
-    // Ahead of leader looking back — horses charge the camera
+    // Ahead of leader, looking back — pack charges the camera
     if(ld){
-      const ahead=getTrackPos(ld.progress+0.08,0);
-      tp.set(ahead.x,3.0,ahead.z);
-      ta.set(pc.x,2.0,pc.z);
+      const ahead=trackPos(ld.progress+0.08, 0);
+      tp.set(ahead.x, 3.2, ahead.z); ta.set(pc.x, 2.0, pc.z);
     }
-    camLabel.innerHTML='<span class="rec">●</span> HEAD-ON';
-    smooth=1.8;
+    camLabel.innerHTML='<span class="rec">●</span> HEAD-ON'; sm=1.8;
 
   } else {
-    // Finish line — side on, tight
-    const fp=trackCurve.getPointAt(0);
-    const ft=trackCurve.getTangentAt(0);
-    const fn=new THREE.Vector3(ft.z,0,-ft.x);
-    tp.set(fp.x+fn.x*(OVAL_W/2+9),3.5,fp.z+fn.z*(OVAL_W/2+9));
-    ta.set(fp.x,2.0,fp.z);
-    camLabel.innerHTML='<span class="rec">●</span> FINISH LINE';
-    smooth=4.0;
+    // Finish line — side-on tight
+    const fp=trackPos(0,0);
+    const fside=trackPos(0, TW/2+10);
+    tp.set(fside.x, 3.5, fside.z); ta.set(fp.x, 2.0, fp.z);
+    camLabel.innerHTML='<span class="rec">●</span> FINISH LINE'; sm=4.0;
   }
 
-  const a=1-Math.exp(-smooth*dt);
+  const a=1-Math.exp(-sm*dt);
   camPos.lerp(tp,a); camAim.lerp(ta,a);
   camera.position.copy(camPos); camera.lookAt(camAim);
 }
 
-/* ── RESULTS ─────────────────────────────────────────── */
+// ── RESULTS ───────────────────────────────────────────────────────────────────
 function showResults(){
   const order=[...deerObjs].filter(Boolean).sort((a,b)=>a.place-b.place);
   const rows=order.map(d=>`<div class="rrow">
@@ -713,31 +727,33 @@ function showResults(){
   </div>`).join('');
   overlay.innerHTML=`<div class="card"><div class="resultCard">
     <h2>🏆 ${order[0].name} wins!</h2>${rows}
-    <div class="credit">Model: "Deer Animation" by DarryleH · CC-BY-4.0 · sketchfab.com</div>
-    <div style="margin-top:1.1rem"><button class="bigBtn" id="again" style="display:block">Race Again</button></div>
+    <div class="credit">Model: "Deer Animation" by DarryleH · CC-BY-4.0 · sketchfab.com · ${VERSION}</div>
+    <div style="margin-top:1.1rem">
+      <button class="bigBtn" id="again" style="display:block">Race Again</button>
+    </div>
   </div></div>`;
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
       <h1>The <span class="g">Reindeer</span> Dash</h1>
-      <p class="sub">9 runners · oval track · pure chaos · ${VERSION}</p>
-      <button class="bigBtn" id="startBtn2" style="display:block;margin:1.5rem auto 0">Race Again</button>
+      <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
+      <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
     overlay.classList.remove('off');
-    document.getElementById('startBtn2').addEventListener('click',beginRace);
+    document.getElementById('s2').addEventListener('click', beginRace);
   });
 }
 
-/* ── MAIN LOOP ───────────────────────────────────────── */
+// ── MAIN LOOP ─────────────────────────────────────────────────────────────────
 function animate(){
   requestAnimationFrame(animate);
-  const dt=Math.min(0.05,clock.getDelta());
+  const dt=Math.min(0.05, clock.getDelta());
   const sp=snowGeo.attributes.position;
-  for(let i=0;i<sp.count;i++){let y=sp.getY(i)-11*dt;if(y<0)y=65;sp.setY(i,y);}
+  for(let i=0;i<sp.count;i++){ let y=sp.getY(i)-11*dt; if(y<0)y=65; sp.setY(i,y); }
   sp.needsUpdate=true;
-  if(racing)updateRace(dt);
+  if(racing) updateRace(dt);
   directCamera(dt);
-  renderer.render(scene,camera);
+  renderer.render(scene, camera);
 }
 
 init();
