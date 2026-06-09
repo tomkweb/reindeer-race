@@ -87,7 +87,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v2.2';
+const VERSION='v2.3';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 const ELF_COLORS=['#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#1976d2'];
@@ -432,11 +432,29 @@ function normalizeClip(clip){
   return clip;
 }
 function loadAllDeer(){
+  // Visible check that GLTFLoader loaded from CDN
+  if(!THREE.GLTFLoader){
+    loadMsg.textContent='ERROR: 3D loader not available. Check internet connection.';
+    loadMsg.style.color='#ff8888';
+    return;
+  }
   const loader=new THREE.GLTFLoader();
+  // Show a network error on screen if nothing loads after 8 seconds
+  setTimeout(()=>{
+    if(deerLoaded===0){
+      loadMsg.textContent='Network error loading models. Try refreshing.';
+      loadMsg.style.color='#ff8888';
+    }
+  },8000);
   for(let i=0;i<N;i++){
     (function(idx){
-      loader.load('./scene.gltf', gltf=>onLoaded(gltf,idx), null,
-        err=>console.error('Deer load error',idx,err));
+      loader.load('./scene.gltf', gltf=>onLoaded(gltf,idx),
+        null,
+        err=>{
+          loadMsg.textContent='Model load failed ('+idx+'): '+err;
+          loadMsg.style.color='#ff8888';
+        }
+      );
     })(i);
   }
 }
