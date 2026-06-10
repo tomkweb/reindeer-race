@@ -73,7 +73,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v3.3</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v3.4</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -85,15 +85,13 @@ canvas{display:block;}
 </div>
 
 <!-- Calibration overlay — Rudolph only, rotate + nose sliders -->
-<div id="calOverlay" style="display:none;position:fixed;inset:0;z-index:15;background:#0d1530">
-  <canvas id="calCanvas" style="display:block;width:100%;height:100%"></canvas>
+<div id="calOverlay" style="display:none;position:fixed;inset:0;z-index:15;pointer-events:none">
   <!-- Rotation drag hint -->
   <div style="position:fixed;top:12px;left:0;right:0;text-align:center;color:#f4c95d;
     font-family:'Luckiest Guy',cursive;font-size:1.1rem;pointer-events:none;
     text-shadow:0 2px 6px rgba(0,0,0,.8)">Drag to rotate · Pinch to zoom</div>
-  <!-- Sliders panel -->
   <div style="position:fixed;bottom:0;left:0;right:0;background:rgba(13,21,48,.92);
-    border-top:1px solid rgba(255,100,100,.4);padding:12px 16px 20px;font-family:'Fredoka'">
+    border-top:1px solid rgba(255,100,100,.4);padding:12px 16px 20px;font-family:'Fredoka';pointer-events:auto">
     <div style="display:grid;grid-template-columns:90px 1fr 46px;align-items:center;gap:6px 8px;color:#fff;font-size:.88rem">
       <label>Forward ↔</label>
       <input type="range" id="cZ" min="-2" max="2" step="0.02" value="0.50" style="accent-color:#f4c95d;width:100%">
@@ -126,7 +124,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v3.3';
+const VERSION='v3.4';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 const ELF_COLORS=['#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#1976d2'];
@@ -793,108 +791,72 @@ function showResults(){
 }
 
 // ── NOSE CALIBRATION ─────────────────────────────────────────────────────────
+let calActive=false, calRotY=0.3, calRotX=-0.1, calZoom=5;
+let calDragging=false, calLastX=0, calLastY=0, calPinchDist=0;
+
 function openCalibration(rud){
-  const overlay=document.getElementById('calOverlay');
-  overlay.style.display='block';
+  calActive=true;
+  document.getElementById('calOverlay').style.display='block';
 
-  const canvas=document.getElementById('calCanvas');
-  canvas.width=canvas.clientWidth*devicePixelRatio;
-  canvas.height=canvas.clientHeight*devicePixelRatio;
-
-  // Mini renderer just for calibration
-  const cr=new THREE.WebGLRenderer({canvas,antialias:true});
-  cr.setPixelRatio(devicePixelRatio);
-  cr.setSize(canvas.clientWidth,canvas.clientHeight,false);
-  cr.outputEncoding=THREE.sRGBEncoding;
-  cr.setClearColor(0x1a1340);
-
-  const cScene=new THREE.Scene();
-  cScene.add(new THREE.HemisphereLight(0xd4eaff,0x6a7a90,1.0));
-  const sun=new THREE.DirectionalLight(0xfff0d6,1.2);
-  sun.position.set(-3,5,4); cScene.add(sun);
-
-  const cCam=new THREE.PerspectiveCamera(45,canvas.clientWidth/canvas.clientHeight,0.01,100);
-  cCam.position.set(0,1.5,6);
-  cCam.lookAt(0,1.5,0);
-
-  // Clone Rudolph's group for isolated display
-  const rudGroup=rud.group.clone(true);
-  rudGroup.position.set(0,0,0);
-  rudGroup.rotation.y=0;
-  cScene.add(rudGroup);
-
-  // Nose sphere in calibration scene
-  const noseMat=new THREE.MeshStandardMaterial(
-    {color:0xff2233,emissive:0xff1122,emissiveIntensity:2.0,roughness:.2});
-  const noseMesh=new THREE.Mesh(new THREE.SphereGeometry(.28,14,14),noseMat);
-  cScene.add(noseMesh);
-
-  // Find head bone in cloned group
-  let calHead=null;
-  rudGroup.traverse(n=>{if(!calHead&&n.name&&n.name.toLowerCase().includes('head')) calHead=n;});
-
-  // Orbit state
-  let rotY=0.3, rotX=-0.1, zoom=6, dragging=false, lastX=0, lastY=0;
-
-  function updateNosePos(){
-    if(calHead){
-      const wp=new THREE.Vector3(), wq=new THREE.Quaternion();
-      calHead.getWorldPosition(wp); calHead.getWorldQuaternion(wq);
-      const off=new THREE.Vector3(noseOff.x,noseOff.y,noseOff.z);
-      off.applyQuaternion(wq);
-      noseMesh.position.copy(wp).add(off);
-    }
-  }
-
-  // Touch/mouse orbit on cal canvas
-  canvas.addEventListener('pointerdown',e=>{dragging=true;lastX=e.clientX;lastY=e.clientY;});
-  canvas.addEventListener('pointermove',e=>{
-    if(!dragging) return;
-    rotY+=(e.clientX-lastX)*0.008;
-    rotX+=(e.clientY-lastY)*0.005;
-    rotX=Math.max(-1.2,Math.min(1.2,rotX));
-    lastX=e.clientX; lastY=e.clientY;
+  // Hide all deer except Rudolph, hide elves
+  deerObjs.forEach((d,i)=>{
+    if(!d) return;
+    if(i!==8){ d.group.visible=false; if(d.elf) d.elf.visible=false; }
+    else { d.group.visible=true; if(d.elf) d.elf.visible=false; } // hide elf during cal
   });
-  canvas.addEventListener('pointerup',()=>dragging=false);
-  canvas.addEventListener('wheel',e=>{ zoom=Math.max(1.5,Math.min(12,zoom+e.deltaY*.01)); },{passive:true});
 
-  // Pinch-to-zoom
-  let pinchDist=0;
-  canvas.addEventListener('touchstart',e=>{ if(e.touches.length===2){
-    pinchDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
-  }},{passive:true});
-  canvas.addEventListener('touchmove',e=>{ if(e.touches.length===2){
+  // Centre Rudolph for viewing
+  rud.group.position.set(0,0,0);
+  rud.group.rotation.y=0;
+
+  // Orbit via main renderer canvas
+  const cvs=renderer.domElement;
+  function onDown(e){ calDragging=true; calLastX=e.clientX; calLastY=e.clientY; }
+  function onMove(e){
+    if(!calDragging) return;
+    calRotY+=(e.clientX-calLastX)*0.008;
+    calRotX+=(e.clientY-calLastY)*0.005;
+    calRotX=Math.max(-1.2,Math.min(1.2,calRotX));
+    calLastX=e.clientX; calLastY=e.clientY;
+  }
+  function onUp(){ calDragging=false; }
+  function onWheel(e){ calZoom=Math.max(1.5,Math.min(12,calZoom+e.deltaY*.01)); }
+  function onTStart(e){ if(e.touches.length===2)
+    calPinchDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY); }
+  function onTMove(e){ if(e.touches.length===2){
     const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
-    zoom=Math.max(1.5,Math.min(12,zoom-(d-pinchDist)*0.02));
-    pinchDist=d;
-  }},{passive:true});
+    calZoom=Math.max(1.5,Math.min(12,calZoom-(d-calPinchDist)*0.02)); calPinchDist=d; } }
 
-  // Update sliders when noseOff changes externally
-  [['cX','x'],['cY','y'],['cZ','z']].forEach(([id,axis])=>{
-    const sl=document.getElementById(id);
-    sl.addEventListener('input',()=>updateNosePos());
-  });
+  cvs.addEventListener('pointerdown',onDown);
+  cvs.addEventListener('pointermove',onMove);
+  cvs.addEventListener('pointerup',onUp);
+  cvs.addEventListener('wheel',onWheel,{passive:true});
+  cvs.addEventListener('touchstart',onTStart,{passive:true});
+  cvs.addEventListener('touchmove',onTMove,{passive:true});
 
-  let calRaf;
-  function calLoop(){
-    if(overlay.style.display==='none'){ cr.dispose(); return; }
-    calRaf=requestAnimationFrame(calLoop);
-    cCam.position.set(
-      Math.sin(rotY)*Math.cos(rotX)*zoom,
-      Math.sin(rotX)*zoom+1.5,
-      Math.cos(rotY)*Math.cos(rotX)*zoom
-    );
-    cCam.lookAt(0,1.5,0);
-    updateNosePos();
-    cr.render(cScene,cCam);
-  }
-  calLoop();
-
-  // Done button cancels the loop
+  // Done button
   document.querySelector('#calOverlay button').addEventListener('click',()=>{
-    cancelAnimationFrame(calRaf);
-    cr.dispose();
+    calActive=false;
+    document.getElementById('calOverlay').style.display='none';
+    // Restore all deer
+    deerObjs.forEach(d=>{ if(!d) return; d.group.visible=true; if(d.elf) d.elf.visible=true; });
+    cvs.removeEventListener('pointerdown',onDown);
+    cvs.removeEventListener('pointermove',onMove);
+    cvs.removeEventListener('pointerup',onUp);
+    cvs.removeEventListener('wheel',onWheel);
+    cvs.removeEventListener('touchstart',onTStart);
+    cvs.removeEventListener('touchmove',onTMove);
   },{once:true});
+}
+
+function updateCalCamera(){
+  if(!calActive) return;
+  camera.position.set(
+    Math.sin(calRotY)*Math.cos(calRotX)*calZoom,
+    Math.sin(calRotX)*calZoom+2.0,
+    Math.cos(calRotY)*Math.cos(calRotX)*calZoom
+  );
+  camera.lookAt(0, 2.0, 0);
 }
 
 // ── MAIN LOOP ─────────────────────────────────────────────────────────────────
@@ -905,7 +867,7 @@ function animate(){
   for(let i=0;i<sp.count;i++){ let y=sp.getY(i)-11*dt; if(y<0)y=65; sp.setY(i,y); }
   sp.needsUpdate=true;
   if(racing) updateRace(dt);
-  directCamera(dt);
+  if(calActive) updateCalCamera(); else directCamera(dt);
   renderer.render(scene, camera);
 }
 
