@@ -73,7 +73,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v3.4</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v3.5</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -124,7 +124,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v3.4';
+const VERSION='v3.5';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 const ELF_COLORS=['#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#1976d2'];
@@ -797,6 +797,7 @@ let calDragging=false, calLastX=0, calLastY=0, calPinchDist=0;
 function openCalibration(rud){
   calActive=true;
   document.getElementById('calOverlay').style.display='block';
+  document.getElementById('overlay').style.display='none'; // hide title screen
 
   // Hide all deer except Rudolph, hide elves
   deerObjs.forEach((d,i)=>{
@@ -838,6 +839,7 @@ function openCalibration(rud){
   document.querySelector('#calOverlay button').addEventListener('click',()=>{
     calActive=false;
     document.getElementById('calOverlay').style.display='none';
+    document.getElementById('overlay').style.display='flex'; // restore title screen
     // Restore all deer
     deerObjs.forEach(d=>{ if(!d) return; d.group.visible=true; if(d.elf) d.elf.visible=true; });
     cvs.removeEventListener('pointerdown',onDown);
