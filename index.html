@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v2.9</title>
+<title>Reindeer Dash v3.0</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -72,7 +72,7 @@ canvas{display:block;}
 </div>
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v2.9</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v3.0</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -88,7 +88,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v2.9';
+const VERSION='v3.0';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 const ELF_COLORS=['#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#1976d2'];
@@ -360,8 +360,9 @@ function makeElf(coatColor){
     const e=new THREE.Mesh(new THREE.SphereGeometry(.018,6,6),dark);
     e.position.set(x,.34,.115); g.add(e);
   });
-  g.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(.022,6,6),skin),
-    {position:new THREE.Vector3(0,.31,.125)}));
+  const noseMesh=new THREE.Mesh(new THREE.SphereGeometry(.022,6,6),skin);
+  noseMesh.position.set(0,.31,.125);
+  g.add(noseMesh);
   [-1,1].forEach(s=>{
     const ear=new THREE.Mesh(new THREE.ConeGeometry(.035,.12,5),skin);
     ear.position.set(s*.13,.34,-.01); ear.rotation.z=s*Math.PI/2.2; g.add(ear);
@@ -414,37 +415,20 @@ function loadAllDeer(){
     loadMsg.textContent='Network error — try refreshing.';
     loadMsg.style.color='#ff8888';
   }},20000);
-
-  // Load the model ONCE then clone N times — avoids concurrent-load deduplication bug
-  loader.load('https://raw.githubusercontent.com/tomkweb/reindeer-race/main/scene.gltf',
-    gltf=>{
-      loadMsg.textContent='Preparing deer…';
-      try{
-        const box=new THREE.Box3().setFromObject(gltf.scene);
-        const h=box.getSize(new THREE.Vector3()).y;
-        deerScale=h>0.01?4.0/h:0.01;
-        const runClip =normalizeClip(THREE.AnimationClip.findByName(gltf.animations,'Rundeer'));
-        const idleClip=normalizeClip(THREE.AnimationClip.findByName(gltf.animations,'IdleDeer'));
-        for(let idx=0;idx<N;idx++){
-          try{
-            const s=THREE.SkeletonUtils.clone(gltf.scene);
-            setupDeer(s,runClip,idleClip,idx);
-          }catch(e){
-            loadMsg.textContent='Deer '+idx+' failed: '+e.message;
-            loadMsg.style.color='#ff8888';
-          }
-        }
-      }catch(e){
-        loadMsg.textContent='Setup failed: '+e.message;
-        loadMsg.style.color='#ff8888';
-      }
-    },
-    xhr=>{ if(xhr.total) loadMsg.textContent='Loading model… '+Math.round(xhr.loaded/xhr.total*100)+'%'; },
-    err=>{
-      loadMsg.textContent='Load failed: '+(err.message||String(err));
-      loadMsg.style.color='#ff8888';
-    }
-  );
+  // Load 9 times with unique query strings to bypass Three.js request deduplication
+  for(let i=0;i<N;i++){
+    (function(idx){
+      loader.load(
+        'https://raw.githubusercontent.com/tomkweb/reindeer-race/main/scene.gltf?n='+idx,
+        gltf=>setupDeer(gltf.scene,
+          normalizeClip(THREE.AnimationClip.findByName(gltf.animations,'Rundeer')),
+          normalizeClip(THREE.AnimationClip.findByName(gltf.animations,'IdleDeer')),
+          idx),
+        null,
+        err=>{loadMsg.textContent='Load failed ('+idx+'): '+(err.message||err);loadMsg.style.color='#ff8888';}
+      );
+    })(i);
+  }
 }
 function setupDeer(deerScene, runClip, idleClip, idx){
   deerScene.scale.setScalar(deerScale);
@@ -467,7 +451,6 @@ function setupDeer(deerScene, runClip, idleClip, idx){
       {color:0xff2233,emissive:0xff1122,emissiveIntensity:2.5,roughness:.2});
     noseGroup=new THREE.Group();
     noseGroup.add(new THREE.Mesh(new THREE.SphereGeometry(.28,14,14),nm));
-    noseGroup.add(new THREE.PointLight(0xff3344,3.0,8));
     scene.add(noseGroup);
     deerScene.traverse(nd=>{
       if(!headNode&&nd.name&&nd.name.toLowerCase().includes('head')) headNode=nd;
@@ -738,7 +721,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v2.9</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v3.0</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
