@@ -73,7 +73,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v3.9</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v4.0</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -124,7 +124,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v3.9';
+const VERSION='v4.0';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 const ELF_COLORS=['#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#1976d2'];
@@ -193,7 +193,7 @@ function trackPos(p, laneOff){
 }
 
 // Rudolph nose offset (tune with calibration panel)
-let noseOff = {x:0.00, y:-0.86, z:0.50};
+let noseOff = {x:0.00, y:-0.76, z:-0.02};
 
 const TC_X = 0, TC_Z = STR / 2;
 
