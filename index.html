@@ -62,18 +62,19 @@ canvas{display:block;}
 <div class="hud" id="timer"></div>
 <div class="camBar" id="camBar">
   <button data-cam="auto" class="active">Auto</button>
-  <button data-cam="aerial">Aerial</button>
-  <button data-cam="chase">Chase</button>
-  <button data-cam="rail">Rail</button>
-  <button data-cam="turn">Turn</button>
-  <button data-cam="headon">Head-On</button>
+  <button data-cam="gate">Gate</button>
+  <button data-cam="grandstand">Side</button>
+  <button data-cam="crane">Crane</button>
+  <button data-cam="blimp">Blimp</button>
+  <button data-cam="telephoto">Tele</button>
+  <button data-cam="headon_low">Head-On</button>
+  <button data-cam="wire">Wire</button>
   <button data-cam="infield">Infield</button>
-  <button data-cam="finish">Finish</button>
 </div>
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v4.3</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v4.4</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -124,7 +125,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v4.3';
+const VERSION='v4.4';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 const ELF_COLORS=['#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#1976d2'];
@@ -200,7 +201,9 @@ const TC_X = 0, TC_Z = STR / 2;
 let scene, camera, renderer, clock;
 let deerObjs=new Array(N).fill(null), deerLoaded=0, deerScale=1, autoScaleDone=false;
 let racing=false, raceTime=0, finishCounter=0, finishedAll=false, postTimer=0;
-let camMode='auto', autoPick='wide', autoCutTimer=0;
+let camMode='auto', autoPick='gate', autoCutTimer=0;
+let targetFov=54, currentFov=54; // smooth FOV transitions for telephoto effect
+let winnerCamActive=false, winnerCamTimer=0;
 let snowGeo;
 const camPos = new THREE.Vector3(TC_X, 55, TC_Z - 60);
 const camAim = new THREE.Vector3(TC_X, 0,  TC_Z);
@@ -561,6 +564,7 @@ function setupDeer(deerScene, runClip, idleClip, idx){
 // ── RACE SETUP ────────────────────────────────────────────────────────────────
 function configureRace(){
   raceTime=0; finishCounter=0; finishedAll=false; postTimer=0;
+  winnerCamActive=false; winnerCamTimer=0;
   deerObjs.forEach(d=>{
     if(!d) return;
     d.progress=0; d.place=0; d.finished=false;
@@ -670,31 +674,82 @@ function updateRace(dt){
   timerEl.textContent=raceTime.toFixed(1)+'s';
 
   if(finishCounter>=N&&!finishedAll) finishedAll=true;
-  if(finishedAll){ postTimer+=dt; if(postTimer>2) { racing=false; showResults(); } }
+  if(finishedAll){ postTimer+=dt;
+    if(postTimer>0.8&&!winnerCamActive&&racing){ winnerCamActive=true; racing=false; winnerCamTimer=0; }
+  }
 }
 
 // ── CAMERA DIRECTOR ───────────────────────────────────────────────────────────
 function directCamera(dt){
+  // Smooth FOV transitions — telephoto compression / wide angle per shot type
+  currentFov += (targetFov - currentFov) * Math.min(1, dt * 3);
+  if(Math.abs(currentFov - camera.fov) > 0.05){
+    camera.fov = currentFov;
+    camera.updateProjectionMatrix();
+  }
+
+  // Winner cinematic — orbit winner for 4s before results screen
+  if(winnerCamActive){
+    winnerCamTimer += dt;
+    const w = deerObjs.find(d=>d&&d.place===1);
+    if(w){
+      const angle = winnerCamTimer * 0.6;
+      const tp = new THREE.Vector3(
+        w.group.position.x + Math.sin(angle)*8,
+        3.5,
+        w.group.position.z + Math.cos(angle)*8
+      );
+      const a = 1-Math.exp(-3*dt);
+      camPos.lerp(tp, a); camAim.lerp(new THREE.Vector3(w.group.position.x, 2.5, w.group.position.z), a);
+      camera.position.copy(camPos); camera.lookAt(camAim);
+      targetFov = 40;
+      camLabel.innerHTML='<span class=rec>●</span> ' + w.name.toUpperCase() + ' WINS!';
+    }
+    if(winnerCamTimer > 4.0){ winnerCamActive=false; showResults(); }
+    return;
+  }
+
   let mode=camMode;
   if(mode==='auto'){
     const ld=leader();
     const prog=ld?ld.progress:0;
-    if(raceTime<3.5){
-      autoPick='wide';
-    } else if(prog<0.12){
-      autoPick='aerial';
-    } else if(prog<0.72){
+
+    // Kentucky Derby broadcast sequence — mapped to race progress
+    if(raceTime<2.0){
+      // 00:00:01 — Starting gate close-up panning along gate structure
+      autoPick='gate';
+    } else if(prog<0.10){
+      // 00:00:21-00:00:46 — Gate opens, grandstand high-speed tracking through first turn
+      autoPick='grandstand';
+    } else if(prog<0.28){
+      // 00:00:46-00:01:01 — High-angle jib/crane, field geometry settling into rows
       autoCutTimer-=dt;
       if(autoCutTimer<=0){
-        const pool=['aerial','chase','rail','infield','turn','aerial','chase','aerial','turn'];
-        let pick; do{ pick=pool[Math.floor(Math.random()*pool.length)]; }while(pick===autoPick);
+        const pool=['crane','crane','blimp','grandstand'];
+        let pick; do{pick=pool[Math.floor(Math.random()*pool.length)];}while(pick===autoPick);
+        autoPick=pick; autoCutTimer=3.5+Math.random()*2;
+      }
+    } else if(prog<0.55){
+      // 00:01:01-00:01:10 — Backstretch: vertical aerial blimp showing spacing + infield
+      autoCutTimer-=dt;
+      if(autoCutTimer<=0){
+        const pool=['blimp','blimp','infield','crane','blimp'];
+        let pick; do{pick=pool[Math.floor(Math.random()*pool.length)];}while(pick===autoPick);
         autoPick=pick; autoCutTimer=3+Math.random()*2;
       }
+    } else if(prog<0.72){
+      // 00:01:10 — Far turn telephoto: side-angle lens compression, horses stacked
+      if(autoPick!=='telephoto'){ autoPick='telephoto'; autoCutTimer=999; }
     } else if(prog<0.88){
-      if(autoPick!=='headon'){ autoPick='headon'; autoCutTimer=999; }
+      // 00:02:01 — Home stretch: low head-on zoom, closers launching runs
+      if(autoPick!=='headon_low'){ autoPick='headon_low'; autoCutTimer=999; }
     } else {
+      // 00:02:25 — Wire camera: horizontal tracking locked to finish line plane
       autoCutTimer-=dt;
-      if(autoCutTimer<=0){ autoPick=autoPick==='finish'?'headon':'finish'; autoCutTimer=1.2+Math.random()*.8; }
+      if(autoCutTimer<=0){
+        autoPick=autoPick==='wire'?'headon_low':'wire';
+        autoCutTimer=1.0+Math.random()*0.6;
+      }
     }
     mode=autoPick;
   }
@@ -702,57 +757,73 @@ function directCamera(dt){
   const ld=leader(), pc=packXZ();
   const prog=ld?ld.progress:0;
   let tp=new THREE.Vector3(), ta=new THREE.Vector3(), sm=2.2;
+  targetFov=54; // default — overridden per camera
 
-  if(mode==='wide'){
-    // Establishing shot — high and back, full oval visible
-    tp.set(TC_X, 62, TC_Z-65); ta.set(TC_X, 0, TC_Z);
-    camLabel.innerHTML='<span class="rec">●</span> WIDE — FULL OVAL'; sm=1.2;
+  if(mode==='gate'){
+    // 00:00:01 — Tight panning along starting gate, individual animals visible
+    // Wide angle, low, slightly to the side of the starting area
+    const gp = trackPos(0.01, TW/2+2);
+    tp.set(gp.x+4, 2.5, gp.z-6);
+    ta.set(gp.x-2, 1.8, gp.z+4);
+    camLabel.innerHTML='<span class=rec>●</span> STARTING GATE';
+    targetFov=70; sm=1.5;
 
-  } else if(mode==='aerial'){
-    const h=42-prog*24;
-    tp.set(pc.x*.2, Math.max(14,h), pc.z-32); ta.set(pc.x*.2, 1.5, pc.z+20);
-    camLabel.innerHTML='<span class="rec">●</span> AERIAL';
+  } else if(mode==='grandstand'){
+    // 00:00:26 — High-speed grandstand tracking parallel to homestretch
+    // Camera on outer side of homestretch, eye-level, following the pack
+    const sp=trackPos(Math.min(prog+0.02,0.25), TW/2+14);
+    tp.set(sp.x, 4.0, sp.z);
+    ta.set(pc.x, 2.0, pc.z+6);
+    camLabel.innerHTML='<span class=rec>●</span> GRANDSTAND TRACK'; sm=2.8;
 
-  } else if(mode==='chase'){
+  } else if(mode==='crane'){
+    // 00:00:46 — High jib/crane pan showing field geometry
+    const h=38-prog*18;
+    tp.set(TC_X+15, Math.max(20,h), TC_Z-20);
+    ta.set(pc.x, 1.5, pc.z+10);
+    camLabel.innerHTML='<span class=rec>●</span> CRANE'; targetFov=48; sm=1.8;
+
+  } else if(mode==='blimp'){
+    // 00:01:01 — Near top-down vertical aerial blimp, shows absolute spacing
+    tp.set(pc.x*0.1, 55, pc.z*0.9);
+    ta.set(pc.x*0.1, 0, pc.z+5);
+    camLabel.innerHTML='<span class=rec>●</span> BLIMP'; targetFov=38; sm=1.2;
+
+  } else if(mode==='telephoto'){
+    // 00:01:10 — Side-angle telephoto on far turn, lens compression stacks horses
+    // Far from pack, very narrow FOV = compression effect makes field look tightly bunched
+    const inTop=prog>0.4&&prog<0.60;
+    const camZ = inTop ? STR+TR*0.8 : -TR*0.8;
+    tp.set(TC_X+55, 8, camZ);
+    ta.set(pc.x, 2.5, pc.z);
+    camLabel.innerHTML='<span class=rec>●</span> TELEPHOTO'; targetFov=18; sm=1.5;
+
+  } else if(mode==='headon_low'){
+    // 00:02:01 — Ground-level head-on zoom facing oncoming horses (very dramatic)
     if(ld){
-      const back=trackPos(ld.progress-0.03, ld.laneOff*.5);
-      tp.set(back.x, 5.0, back.z);
-      ta.set(ld.group.position.x, 2.5, ld.group.position.z);
+      const ahead=trackPos(ld.progress+0.07, 0);
+      tp.set(ahead.x, 0.9, ahead.z);
+      ta.set(pc.x, 1.5, pc.z);
     }
-    camLabel.innerHTML='<span class="rec">●</span> CHASE — '+(ld?ld.name.toUpperCase():''); sm=2.5;
+    camLabel.innerHTML='<span class=rec>●</span> LOW HEAD-ON'; targetFov=28; sm=1.6;
 
-  } else if(mode==='rail'){
-    // Trackside eye-level, pack sweeps past
-    const sp=trackPos((prog-.05+1)%1, -(TW/2+12));
-    tp.set(sp.x, 3.5, sp.z); ta.set(pc.x, 2.0, pc.z);
-    camLabel.innerHTML='<span class="rec">●</span> RAIL CAM'; sm=3.5;
-
-  } else if(mode==='turn'){
-    // Inside the turn apex looking at horses sweeping around — classic oval shot
-    const inTop=prog>0.15&&prog<0.50;
-    const cz=inTop?STR:0;
-    tp.set(TC_X, 4, cz); ta.set(pc.x, 2.0, pc.z);
-    camLabel.innerHTML='<span class="rec">●</span> TURN CAM'; sm=2.0;
+  } else if(mode==='wire'){
+    // 00:02:25 — Wire camera: horizontal tracking locked to finish line plane
+    // Lightning-fast side shot, very low, locked to finish Z
+    const fp=trackPos(0,0);
+    tp.set(fp.x + TW/2 + 12, 1.0, fp.z);
+    ta.set(fp.x - TW/2, 1.0, fp.z);
+    camLabel.innerHTML='<span class=rec>●</span> WIRE CAM'; targetFov=22; sm=5.0;
 
   } else if(mode==='infield'){
-    // Low inside the oval, horses thunder past
-    tp.set(pc.x*.2, 0.9, pc.z+7); ta.set(pc.x*.2+5, 2.5, pc.z-8);
-    camLabel.innerHTML='<span class="rec">●</span> INFIELD'; sm=3.5;
-
-  } else if(mode==='headon'){
-    // Ahead of leader, looking back — pack charges the camera
-    if(ld){
-      const ahead=trackPos(ld.progress+0.08, 0);
-      tp.set(ahead.x, 3.2, ahead.z); ta.set(pc.x, 2.0, pc.z);
-    }
-    camLabel.innerHTML='<span class="rec">●</span> HEAD-ON'; sm=1.8;
+    // Inside the oval, low — horses thunder past
+    tp.set(pc.x*.2, 0.9, pc.z+6); ta.set(pc.x*.2+5, 2.5, pc.z-8);
+    camLabel.innerHTML='<span class=rec>●</span> INFIELD'; sm=3.5;
 
   } else {
-    // Finish line — side-on tight
-    const fp=trackPos(0,0);
-    const fside=trackPos(0, TW/2+10);
-    tp.set(fside.x, 3.5, fside.z); ta.set(fp.x, 2.0, fp.z);
-    camLabel.innerHTML='<span class="rec">●</span> FINISH LINE'; sm=4.0;
+    // Fallback: aerial
+    tp.set(TC_X, 40, TC_Z-35); ta.set(TC_X, 0, TC_Z);
+    camLabel.innerHTML='<span class=rec>●</span> AERIAL'; sm=1.5;
   }
 
   const a=1-Math.exp(-sm*dt);
