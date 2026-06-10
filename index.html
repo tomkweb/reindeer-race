@@ -73,7 +73,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v4.0</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v4.1</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -124,7 +124,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v4.0';
+const VERSION='v4.1';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 const ELF_COLORS=['#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#1976d2'];
@@ -504,8 +504,8 @@ function setupDeer(deerScene, runClip, idleClip, idx){
     n.material=mat; n.castShadow=true; n.receiveShadow=true;
   });
 
-  // Rudolph's nose
-  let headNode=null, noseGroup=null;
+  // Rudolph's nose — track headTip bone (exact snout tip) directly
+  let headNode=null, headTipNode=null, noseGroup=null;
   if(idx===8){
     const nm=new THREE.MeshStandardMaterial(
       {color:0xff2233,emissive:0xff1122,emissiveIntensity:2.5,roughness:.2});
@@ -513,7 +513,9 @@ function setupDeer(deerScene, runClip, idleClip, idx){
     noseGroup.add(new THREE.Mesh(new THREE.SphereGeometry(.14,14,14),nm));
     scene.add(noseGroup);
     deerScene.traverse(nd=>{
-      if(!headNode&&nd.name&&nd.name.toLowerCase().includes('head')) headNode=nd;
+      const n=nd.name?nd.name.toLowerCase():'';
+      if(!headNode&&n.includes('head')&&!n.includes('tip')) headNode=nd;
+      if(!headTipNode&&n.includes('headtip')) headTipNode=nd;
     });
   }
 
@@ -544,7 +546,7 @@ function setupDeer(deerScene, runClip, idleClip, idx){
 
   deerObjs[idx]={
     group:deerScene, mixer, action, idleAct,
-    noseGroup, headNode, elf, backBone,
+    noseGroup, headNode, headTipNode, elf, backBone,
     laneOff, progress:0, speed:0,
     base:0, surgeF:0, surgeP:0, amp:0,
     flightProg:-1, flightDur:0, flightAlt:0, nextFlight:0,
@@ -643,16 +645,14 @@ function updateRace(dt){
     }
   });
 
-  // Rudolph nose
+  // Rudolph nose — track headTip bone directly, no offset math needed
   const rud=deerObjs[8];
   if(rud&&rud.noseGroup){
-    if(rud.headNode){
-      const wp=new THREE.Vector3(), wq=new THREE.Quaternion();
-      rud.headNode.getWorldPosition(wp); rud.headNode.getWorldQuaternion(wq);
-      const off=new THREE.Vector3(noseOff.x, noseOff.y, noseOff.z); off.applyQuaternion(wq);
-      rud.noseGroup.position.copy(wp).add(off);
-    } else {
-      rud.noseGroup.position.set(rud.group.position.x, rud.group.position.y+3.4, rud.group.position.z);
+    const trackNode=rud.headTipNode||rud.headNode;
+    if(trackNode){
+      const wp=new THREE.Vector3();
+      trackNode.getWorldPosition(wp);
+      rud.noseGroup.position.copy(wp);
     }
   }
 
@@ -859,14 +859,11 @@ function updateCalCamera(){
     Math.cos(calRotY)*Math.cos(calRotX)*calZoom
   );
   camera.lookAt(0, 2.0, 0);
-  // Update nose position from current noseOff sliders
+  // Update nose position — track headTip bone directly
   const rud=deerObjs[8];
-  if(rud&&rud.noseGroup&&rud.headNode){
-    const wp=new THREE.Vector3(), wq=new THREE.Quaternion();
-    rud.headNode.getWorldPosition(wp); rud.headNode.getWorldQuaternion(wq);
-    const off=new THREE.Vector3(noseOff.x,noseOff.y,noseOff.z);
-    off.applyQuaternion(wq);
-    rud.noseGroup.position.copy(wp).add(off);
+  if(rud&&rud.noseGroup){
+    const trackNode=rud.headTipNode||rud.headNode;
+    if(trackNode){ const wp=new THREE.Vector3(); trackNode.getWorldPosition(wp); rud.noseGroup.position.copy(wp); }
   }
 }
 
