@@ -73,13 +73,13 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v3.2</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v3.3</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
     <div style="display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap">
       <button class="bigBtn" id="startBtn">Start Race</button>
-      <button class="bigBtn" id="calBtn" style="background:linear-gradient(180deg,#e87777,#c44040);box-shadow:0 6px 0 #7a1a1a">🔴 Calibrate Nose</button>
+      <button class="bigBtn" id="calBtn" style="background:linear-gradient(180deg,#e87777,#c44040);box-shadow:0 6px 0 #7a1a1a;display:none">🔴 Calibrate Nose</button>
     </div>
   </div>
 </div>
@@ -126,7 +126,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v3.2';
+const VERSION='v3.3';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 const ELF_COLORS=['#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#1976d2'];
@@ -556,7 +556,7 @@ function setupDeer(deerScene, runClip, idleClip, idx){
   deerLoaded++;
   loadBar.style.width=(deerLoaded/N*100)+'%';
   loadMsg.textContent='Cloning deer… '+deerLoaded+'/9';
-  if(deerLoaded===N){ loadMsg.textContent='Ready!'; startBtn.style.display='block'; }
+  if(deerLoaded===N){ loadMsg.textContent='Ready!'; startBtn.style.display='block'; document.getElementById('calBtn').style.display='block'; }
 }
 
 
