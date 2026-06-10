@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v2.8</title>
+<title>Reindeer Dash v2.9</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -72,7 +72,7 @@ canvas{display:block;}
 </div>
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v2.8</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v2.9</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -88,7 +88,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v2.8';
+const VERSION='v2.9';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 const ELF_COLORS=['#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#1976d2'];
@@ -419,16 +419,24 @@ function loadAllDeer(){
   loader.load('https://raw.githubusercontent.com/tomkweb/reindeer-race/main/scene.gltf',
     gltf=>{
       loadMsg.textContent='Preparing deer…';
-      // Scale from original bounding box
-      const box=new THREE.Box3().setFromObject(gltf.scene);
-      const h=box.getSize(new THREE.Vector3()).y;
-      deerScale=h>0.01?4.0/h:0.01;
-      // Normalise clips once (shared read-only across all mixers)
-      const runClip =normalizeClip(THREE.AnimationClip.findByName(gltf.animations,'Rundeer'));
-      const idleClip=normalizeClip(THREE.AnimationClip.findByName(gltf.animations,'IdleDeer'));
-      for(let idx=0;idx<N;idx++){
-        const s=THREE.SkeletonUtils.clone(gltf.scene);
-        setupDeer(s,runClip,idleClip,idx);
+      try{
+        const box=new THREE.Box3().setFromObject(gltf.scene);
+        const h=box.getSize(new THREE.Vector3()).y;
+        deerScale=h>0.01?4.0/h:0.01;
+        const runClip =normalizeClip(THREE.AnimationClip.findByName(gltf.animations,'Rundeer'));
+        const idleClip=normalizeClip(THREE.AnimationClip.findByName(gltf.animations,'IdleDeer'));
+        for(let idx=0;idx<N;idx++){
+          try{
+            const s=THREE.SkeletonUtils.clone(gltf.scene);
+            setupDeer(s,runClip,idleClip,idx);
+          }catch(e){
+            loadMsg.textContent='Deer '+idx+' failed: '+e.message;
+            loadMsg.style.color='#ff8888';
+          }
+        }
+      }catch(e){
+        loadMsg.textContent='Setup failed: '+e.message;
+        loadMsg.style.color='#ff8888';
       }
     },
     xhr=>{ if(xhr.total) loadMsg.textContent='Loading model… '+Math.round(xhr.loaded/xhr.total*100)+'%'; },
@@ -730,7 +738,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v2.8</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v2.9</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
