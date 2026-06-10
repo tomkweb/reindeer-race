@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v2.7</title>
+<title>Reindeer Dash v2.8</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -72,7 +72,7 @@ canvas{display:block;}
 </div>
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v2.7</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v2.8</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -81,13 +81,14 @@ canvas{display:block;}
 </div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
 <script>
 window.onerror=function(msg,src,line){
   document.body.innerHTML+='<div style="position:fixed;top:0;left:0;right:0;background:red;color:#fff;padding:12px;font-size:14px;z-index:999;word-break:break-all">ERROR line '+line+': '+msg+'</div>';
   return false;
 };
 (function(){
-const VERSION='v2.7';
+const VERSION='v2.8';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 const ELF_COLORS=['#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#1976d2'];
@@ -404,44 +405,45 @@ function normalizeClip(clip){
   return clip;
 }
 function loadAllDeer(){
-  // Visible check that GLTFLoader loaded from CDN
   if(!THREE.GLTFLoader){
-    loadMsg.textContent='ERROR: 3D loader not available. Check internet connection.';
-    loadMsg.style.color='#ff8888';
-    return;
+    loadMsg.textContent='ERROR: 3D loader not available.';
+    loadMsg.style.color='#ff8888'; return;
   }
   const loader=new THREE.GLTFLoader();
-  // Show a network error on screen if nothing loads after 8 seconds
-  setTimeout(()=>{
-    if(deerLoaded===0){
-      loadMsg.textContent='Network error loading models. Try refreshing.';
+  setTimeout(()=>{if(deerLoaded===0){
+    loadMsg.textContent='Network error — try refreshing.';
+    loadMsg.style.color='#ff8888';
+  }},20000);
+
+  // Load the model ONCE then clone N times — avoids concurrent-load deduplication bug
+  loader.load('https://raw.githubusercontent.com/tomkweb/reindeer-race/main/scene.gltf',
+    gltf=>{
+      loadMsg.textContent='Preparing deer…';
+      // Scale from original bounding box
+      const box=new THREE.Box3().setFromObject(gltf.scene);
+      const h=box.getSize(new THREE.Vector3()).y;
+      deerScale=h>0.01?4.0/h:0.01;
+      // Normalise clips once (shared read-only across all mixers)
+      const runClip =normalizeClip(THREE.AnimationClip.findByName(gltf.animations,'Rundeer'));
+      const idleClip=normalizeClip(THREE.AnimationClip.findByName(gltf.animations,'IdleDeer'));
+      for(let idx=0;idx<N;idx++){
+        const s=THREE.SkeletonUtils.clone(gltf.scene);
+        setupDeer(s,runClip,idleClip,idx);
+      }
+    },
+    xhr=>{ if(xhr.total) loadMsg.textContent='Loading model… '+Math.round(xhr.loaded/xhr.total*100)+'%'; },
+    err=>{
+      loadMsg.textContent='Load failed: '+(err.message||String(err));
       loadMsg.style.color='#ff8888';
     }
-  },20000);
-  for(let i=0;i<N;i++){
-    (function(idx){
-      loader.load('https://raw.githubusercontent.com/tomkweb/reindeer-race/main/scene.gltf', gltf=>onLoaded(gltf,idx),
-        null,
-        err=>{
-          loadMsg.textContent='Model load failed ('+idx+'): '+err;
-          loadMsg.style.color='#ff8888';
-        }
-      );
-    })(i);
-  }
+  );
 }
-function onLoaded(gltf, idx){
-  if(!autoScaleDone){
-    autoScaleDone=true;
-    const box=new THREE.Box3().setFromObject(gltf.scene);
-    const h=box.getSize(new THREE.Vector3()).y;
-    deerScale = h>0.01 ? 4.0/h : 0.01;
-  }
-  gltf.scene.scale.setScalar(deerScale);
+function setupDeer(deerScene, runClip, idleClip, idx){
+  deerScene.scale.setScalar(deerScale);
 
   // Colour tint
   const tint=new THREE.Color(COLORS[idx]);
-  gltf.scene.traverse(n=>{
+  deerScene.traverse(n=>{
     if(!n.isMesh) return;
     const orig=Array.isArray(n.material)?n.material[0]:n.material;
     const mat=orig.clone();
@@ -459,14 +461,14 @@ function onLoaded(gltf, idx){
     noseGroup.add(new THREE.Mesh(new THREE.SphereGeometry(.28,14,14),nm));
     noseGroup.add(new THREE.PointLight(0xff3344,3.0,8));
     scene.add(noseGroup);
-    gltf.scene.traverse(nd=>{
+    deerScene.traverse(nd=>{
       if(!headNode&&nd.name&&nd.name.toLowerCase().includes('head')) headNode=nd;
     });
   }
 
   // Spine bone for elf seat
   let backBone=null;
-  gltf.scene.traverse(nd=>{
+  deerScene.traverse(nd=>{
     if(!backBone&&nd.name&&/back_0\d+$/i.test(nd.name)) backBone=nd;
   });
 
@@ -475,24 +477,22 @@ function onLoaded(gltf, idx){
   elf.scale.setScalar(2.2);
   scene.add(elf);
 
-  // Animations
-  const mixer    =new THREE.AnimationMixer(gltf.scene);
-  const runClip  =normalizeClip(THREE.AnimationClip.findByName(gltf.animations,'Rundeer'));
-  const idleClip =normalizeClip(THREE.AnimationClip.findByName(gltf.animations,'IdleDeer'));
-  const action   =mixer.clipAction(runClip);
-  const idleAct  =mixer.clipAction(idleClip);
-  action.setLoop(THREE.LoopRepeat, Infinity);
+  // Animation mixer per deer (clips are shared, mixers are per-instance)
+  const mixer  =new THREE.AnimationMixer(deerScene);
+  const action =mixer.clipAction(runClip);
+  const idleAct=mixer.clipAction(idleClip);
+  action.setLoop(THREE.LoopRepeat,Infinity);
   action.play(); action.paused=true;
   idleAct.play(); idleAct.paused=true;
 
   const laneOff=(idx-(N-1)/2)*LANE_W;
-  const sp=trackPos(0, laneOff);
-  gltf.scene.position.set(sp.x, 0, sp.z);
-  gltf.scene.rotation.y=sp.ry;
-  scene.add(gltf.scene);
+  const sp=trackPos(0,laneOff);
+  deerScene.position.set(sp.x,0,sp.z);
+  deerScene.rotation.y=sp.ry;
+  scene.add(deerScene);
 
   deerObjs[idx]={
-    group:gltf.scene, mixer, action, idleAct,
+    group:deerScene, mixer, action, idleAct,
     noseGroup, headNode, elf, backBone,
     laneOff, progress:0, speed:0,
     base:0, surgeF:0, surgeP:0, amp:0,
@@ -502,9 +502,10 @@ function onLoaded(gltf, idx){
 
   deerLoaded++;
   loadBar.style.width=(deerLoaded/N*100)+'%';
-  loadMsg.textContent='Loading... '+deerLoaded+'/9';
+  loadMsg.textContent='Cloning deer… '+deerLoaded+'/9';
   if(deerLoaded===N){ loadMsg.textContent='Ready!'; startBtn.style.display='block'; }
 }
+
 
 // ── RACE SETUP ────────────────────────────────────────────────────────────────
 function configureRace(){
@@ -729,7 +730,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v2.7</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v2.8</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
