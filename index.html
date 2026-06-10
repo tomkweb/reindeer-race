@@ -87,7 +87,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v2.4';
+const VERSION='v2.5';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 const ELF_COLORS=['#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#1976d2'];
@@ -204,10 +204,10 @@ function init(){
   scene.add(sun);
 
   buildGround();
-  buildOvalTrack();
   buildScenery();
   buildSnow();
-  loadAllDeer();
+  loadAllDeer();        // ← start loading models immediately
+  buildOvalTrack();     // ← build track geometry after
 
   document.querySelectorAll('.camBar button').forEach(b=>b.addEventListener('click',()=>{
     camMode = b.dataset.cam;
@@ -236,75 +236,47 @@ function buildGround(){
 
 // ── OVAL TRACK VISUAL ─────────────────────────────────────────────────────────
 function buildOvalTrack(){
-  const railMat = new THREE.MeshStandardMaterial({color: 0xfafcff, roughness: 0.6});
-  const postMat = new THREE.MeshStandardMaterial({color: 0xcc3344});
-  const bannerMat = new THREE.MeshStandardMaterial({color: 0x155724});
-  const hw = TW/2 + 1.5;          // half-width to rail from centreline
-  const N_PTS = 180;               // sample resolution
+  const railMat  = new THREE.MeshStandardMaterial({color:0xfafcff,roughness:.6});
+  const postMat  = new THREE.MeshStandardMaterial({color:0xcc3344});
+  const bannerMat= new THREE.MeshStandardMaterial({color:0x155724});
+  const hw = TW/2 + 1.5;
+  const nPosts = 60;
 
-  // Generate inner and outer rail centreline points analytically
-  function railPoints(offset){
-    const pts = [];
-    for(let i = 0; i < N_PTS; i++){
-      const sp = trackPos(i/N_PTS, offset);
-      pts.push(new THREE.Vector3(sp.x, 0.55, sp.z));
-    }
-    return pts;
-  }
-  const inPts  = railPoints(-hw);
-  const outPts = railPoints( hw);
-
-  // Build closed TubeGeometry for each rail
-  function makeTube(pts){
-    const curve = new THREE.CatmullRomCurve3(pts, true);
-    const mesh  = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, N_PTS, 0.14, 6, true),
-      railMat
-    );
-    mesh.castShadow = true;
-    return mesh;
-  }
-  scene.add(makeTube(inPts));
-  scene.add(makeTube(outPts));
-
-  // Fence posts
-  for(let i = 0; i < 52; i++){
-    const u = i/52;
-    [trackPos(u,-hw), trackPos(u,hw)].forEach(sp=>{
-      const post = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.15, 0.15, 1.3, 8),
-        postMat
-      );
-      post.position.set(sp.x, 0.65, sp.z);
+  // Fence posts + horizontal rail bars around inner and outer edges
+  for(let i=0;i<nPosts;i++){
+    const u0=i/nPosts, u1=(i+1)/nPosts;
+    [- hw, hw].forEach(off=>{
+      const a=trackPos(u0,off), b=trackPos(u1,off);
+      // Post
+      const post=new THREE.Mesh(new THREE.CylinderGeometry(.15,.15,1.3,7),postMat);
+      post.position.set(a.x,.65,a.z);
       scene.add(post);
+      // Rail bar connecting this post to the next
+      const mx=(a.x+b.x)/2, mz=(a.z+b.z)/2;
+      const dx=b.x-a.x, dz=b.z-a.z;
+      const len=Math.sqrt(dx*dx+dz*dz);
+      const rail=new THREE.Mesh(new THREE.BoxGeometry(len,.12,.22),railMat);
+      rail.position.set(mx,.95,mz);
+      rail.rotation.y=-Math.atan2(dz,dx);
+      scene.add(rail);
     });
   }
 
-  // Finish-line gantry (at progress = 0, bottom of homestretch)
-  const fp = trackPos(0, 0);
-  const pi = trackPos(0, -hw-1);
-  const po = trackPos(0,  hw+1);
-  [pi, po].forEach(sp=>{
-    const pole = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.30, 0.30, 9, 10),
-      postMat
-    );
-    pole.position.set(sp.x, 4.5, sp.z);
-    scene.add(pole);
+  // Finish line gantry at progress=0
+  const fp=trackPos(0,0);
+  const fi=trackPos(0,-hw-1), fo=trackPos(0,hw+1);
+  [fi,fo].forEach(sp=>{
+    const pole=new THREE.Mesh(new THREE.CylinderGeometry(.3,.3,9,10),postMat);
+    pole.position.set(sp.x,4.5,sp.z); scene.add(pole);
   });
-  const ban = new THREE.Mesh(new THREE.BoxGeometry(TW+4, 2, 0.25), bannerMat);
-  ban.position.set(fp.x, 8.5, fp.z);
-  // Banner faces perpendicular to the track tangent
-  ban.rotation.y = fp.ry - Math.PI/2;
+  const ban=new THREE.Mesh(new THREE.BoxGeometry(TW+4,2,.25),bannerMat);
+  ban.position.set(fp.x,8.5,fp.z);
+  ban.rotation.y=fp.ry-Math.PI/2;
   scene.add(ban);
-
-  // Ground stripe at finish
-  const stripe = new THREE.Mesh(
-    new THREE.BoxGeometry(TW+4, 0.04, 1.0),
-    new THREE.MeshStandardMaterial({color: 0x111111})
-  );
-  stripe.rotation.y = fp.ry - Math.PI/2;
-  stripe.position.set(fp.x, 0.03, fp.z);
+  const stripe=new THREE.Mesh(new THREE.BoxGeometry(TW+4,.04,1.0),
+    new THREE.MeshStandardMaterial({color:0x111111}));
+  stripe.rotation.y=fp.ry-Math.PI/2;
+  stripe.position.set(fp.x,.03,fp.z);
   scene.add(stripe);
 }
 
