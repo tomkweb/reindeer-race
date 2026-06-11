@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v5.1</title>
+<title>Reindeer Dash v5.2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -74,7 +74,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.1</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.2</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -125,7 +125,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v5.1';
+const VERSION='v5.2';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 const ELF_COLORS=['#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#1976d2'];
@@ -384,11 +384,11 @@ function buildScenery(){
 // ── SNOW ──────────────────────────────────────────────────────────────────────
 function buildSnow(){
   snowGeo = new THREE.BufferGeometry();
-  const cnt=700, arr=new Float32Array(cnt*3);
+  const cnt=2000, arr=new Float32Array(cnt*3);
   for(let i=0;i<cnt;i++){
-    arr[i*3]   = (Math.random()-.5)*200;
-    arr[i*3+1] = Math.random()*65;
-    arr[i*3+2] = TC_Z + (Math.random()-.5)*220;
+    arr[i*3]   = (Math.random()-.5)*900;
+    arr[i*3+1] = Math.random()*80;
+    arr[i*3+2] = TC_Z + (Math.random()-.5)*900;
   }
   snowGeo.setAttribute('position', new THREE.BufferAttribute(arr,3));
   scene.add(new THREE.Points(snowGeo,
@@ -797,43 +797,56 @@ function directCamera(dt){
     camLabel.innerHTML='<span class="rec">●</span> STARTING GATE'; targetFov=55; sm=1.5;
 
   } else if(mode==='grandstand'){
-    const sp=trackPos(Math.min(ld?ld.progress:P_GATE, P_GATE+0.35), TW/2+18);
-    tp.set(sp.x, 5, sp.z); ta.set(pc.x, 2, pc.z+8);
-    camLabel.innerHTML='<span class="rec">●</span> GRANDSTAND'; sm=2.8;
+    // Side-on at pack height, offset from outer rail, tracks leaders
+    tp.set(pc.x + TR + TW + 30, 8, pc.z);
+    ta.set(pc.x, 3, pc.z);
+    camLabel.innerHTML='<span class="rec">●</span> GRANDSTAND'; sm=2.5;
 
   } else if(mode==='crane'){
-    tp.set(TR*0.3+20, 200, STR*0.5-30); ta.set(pc.x, 0, pc.z+20);
+    // Elevated crane — high but not absurdly so, looking down at pack
+    tp.set(pc.x + 40, 55, pc.z - 60);
+    ta.set(pc.x, 0, pc.z + 20);
     camLabel.innerHTML='<span class="rec">●</span> CRANE'; targetFov=48; sm=1.5;
 
   } else if(mode==='blimp'){
-    tp.set(pc.x*0.15, 280, pc.z*0.85); ta.set(pc.x*0.1, 0, pc.z+20);
+    // Near top-down aerial — above the pack
+    tp.set(pc.x, 120, pc.z);
+    ta.set(pc.x, 0, pc.z + 30);
     camLabel.innerHTML='<span class="rec">●</span> BLIMP'; targetFov=38; sm=1.0;
 
   } else if(mode==='telephoto'){
-    tp.set(TR+TW+200, 30, pc.z); ta.set(pc.x, 3, pc.z);
-    camLabel.innerHTML='<span class="rec">●</span> TELEPHOTO'; targetFov=12; sm=1.2;
+    // Far side — narrow FOV creates compression effect
+    tp.set(pc.x + TR + TW + 120, 10, pc.z);
+    ta.set(pc.x, 3, pc.z);
+    camLabel.innerHTML='<span class="rec">●</span> TELEPHOTO'; targetFov=14; sm=1.5;
 
   } else if(mode==='headon_low'){
+    // Ground level facing oncoming leaders
     if(ld){
-      const ahead=trackPos(ld.progress+0.085, 0);
-      tp.set(ahead.x, 1.2, ahead.z); ta.set(pc.x, 2, pc.z);
+      const ahead=trackPos(ld.progress + 0.06, 0);
+      tp.set(ahead.x, 2, ahead.z);
+      ta.set(pc.x, 3, pc.z);
     }
-    camLabel.innerHTML='<span class="rec">●</span> LOW HEAD-ON'; targetFov=28; sm=1.8;
+    camLabel.innerHTML='<span class="rec">●</span> LOW HEAD-ON'; targetFov=30; sm=2.0;
 
   } else if(mode==='wire'){
-    // Locked to the finish line rail — doesn't move, deer thunder past
-    const fp=trackPos(0,0);
-    tp.set(fp.x+TW+20, 1.5, fp.z-2); ta.set(fp.x-TW, 1.5, fp.z+2);
-    camLabel.innerHTML='<span class="rec">●</span> WIRE CAM'; targetFov=22; sm=8.0; // fast snap
+    // Locked to finish line rail — deer thunder past
+    const fp=trackPos(0, 0);
+    tp.set(fp.x + TW + 25, 2, fp.z - 3);
+    ta.set(fp.x - TW, 2, fp.z + 3);
+    camLabel.innerHTML='<span class="rec">●</span> WIRE CAM'; targetFov=22; sm=8.0;
 
   } else if(mode==='infield'){
-    tp.set(pc.x*0.15, 1.2, pc.z+25); ta.set(pc.x*0.15+8, 3, pc.z-15);
+    // Low inside the oval, pack thunders past
+    tp.set(pc.x * 0.3, 2, pc.z + 30);
+    ta.set(pc.x, 4, pc.z - 20);
     camLabel.innerHTML='<span class="rec">●</span> INFIELD'; sm=3.0;
 
   } else {
     // Fallback aerial
-    tp.set(TR, 300, STR*0.3); ta.set(TR*0.3, 0, STR*0.5);
-    camLabel.innerHTML='<span class="rec">●</span> AERIAL'; targetFov=54; sm=1.2;
+    tp.set(pc.x + 40, 55, pc.z - 60);
+    ta.set(pc.x, 0, pc.z + 20);
+    camLabel.innerHTML='<span class="rec">●</span> AERIAL'; targetFov=48; sm=1.2;
   }
 
   const a=1-Math.exp(-sm*dt);
@@ -859,7 +872,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.1</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.2</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
