@@ -125,7 +125,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v4.5';
+const VERSION='v4.6';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 const ELF_COLORS=['#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#1976d2'];
@@ -189,7 +189,7 @@ function trackPos(p, laneOff){
   return {
     x  : px + tz * laneOff,
     z  : pz - tx * laneOff,
-    ry : Math.atan2(tx, tz)   // deer faces direction of travel
+    ry : Math.atan2(tx, tz) + Math.PI   // +π flips facing to match reversed travel direction
   };
 }
 
