@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v5.9</title>
+<title>Reindeer Dash v6.0</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -74,7 +74,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.9</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v6.0</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -125,7 +125,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v5.9';
+const VERSION='v6.0';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 const ELF_COLORS=['#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#1976d2'];
@@ -676,8 +676,8 @@ function packXZ(){
 function leadersFrame(){
   const t=topN(3);
   if(t.length===0) return {x:TC_X, z:TC_Z, spread:10};
-  // Weighted centre: leader counts double
-  let x=t[0].group.position.x, z=t[0].group.position.z, w=1;
+  // Weighted centre: leader counts triple — camera never loses the leader
+  let x=t[0].group.position.x*3, z=t[0].group.position.z*3, w=3;
   t.forEach(d=>{x+=d.group.position.x; z+=d.group.position.z; w++;});
   x/=w; z/=w;
   let spread=4;
@@ -923,12 +923,21 @@ function directCamera(dt){
     targetFov=Math.max(22, Math.min(40, lf.spread*2)); sm=2.0;
 
   } else if(mode==='drone'){
-    // Drone tracks leaders after the final turn — flies alongside and slightly above,
-    // gliding with them to and across the finish line
     const lf=leadersFrame();
-    tp.set(lf.x + 9 + lf.spread*0.5, 6 + lf.spread*0.3, lf.z - 9);
-    ta.set(lf.x, 1.8, lf.z + 2);
-    camLabel.innerHTML='<span class="rec">●</span> DRONE'; targetFov=42; sm=3.2;
+    if(raceFrac > 0.955 && ld){
+      // FINAL STRIDES — drone swings ahead of the leader, looking back:
+      // they charge into the camera as they hit the wire
+      const ahead=trackPos(ld.progress + 0.055, 0);
+      tp.set(ahead.x + 4, 5, ahead.z);
+      ta.set(lf.x, 2, lf.z);
+      camLabel.innerHTML='<span class="rec">●</span> DRONE — THE WIRE';
+      targetFov=Math.max(26, Math.min(40, lf.spread*1.6)); sm=4.0;
+    } else {
+      // Glide alongside and slightly above the leaders
+      tp.set(lf.x + 9 + lf.spread*0.5, 6 + lf.spread*0.3, lf.z - 9);
+      ta.set(lf.x, 1.8, lf.z + 2);
+      camLabel.innerHTML='<span class="rec">●</span> DRONE'; targetFov=42; sm=3.2;
+    }
 
   } else if(mode==='wire'){
     const fp=trackPos(0, 0);
@@ -974,7 +983,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.9</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v6.0</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
