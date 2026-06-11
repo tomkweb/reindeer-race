@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v5.6</title>
+<title>Reindeer Dash v5.7</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -74,7 +74,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.6</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.7</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -125,7 +125,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v5.6';
+const VERSION='v5.7';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 const ELF_COLORS=['#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#1976d2'];
@@ -209,7 +209,7 @@ let scene, camera, renderer, clock;
 let deerObjs=new Array(N).fill(null), deerLoaded=0, deerScale=1, autoScaleDone=false;
 let racing=false, raceTime=0, finishCounter=0, finishedAll=false, postTimer=0;
 let preRace=false, preRaceTimer=0;
-const PRE_RACE_DUR=2.5; // seconds of gate head-on before gates open
+const PRE_RACE_DUR=5.0; // seconds of gate head-on before gates open
 let camMode='auto', autoPick='gate', autoCutTimer=0;
 let targetFov=54, currentFov=54; // smooth FOV transitions for telephoto effect
 let winnerCamActive=false, winnerCamTimer=0;
@@ -729,16 +729,20 @@ function directCamera(dt){
 
   // Pre-race: all deer head-on in the gate
   if(preRace){
-    const gp = trackPos(P_GATE, 0);
-    const tp = new THREE.Vector3(gp.x, 3, gp.z - 12);
-    const ta = new THREE.Vector3(gp.x, 1.5, gp.z + 5);
-    camLabel.innerHTML='<span class="rec">●</span> STARTING GATE';
-    targetFov=55;
-    const a=1-Math.exp(-2*dt);
-    camPos.lerp(tp,a); camAim.lerp(ta,a);
+    // Centre on the actual deer pack (mid lane), facing them head-on
+    const gpL = trackPos(P_GATE, -((N-1)/2)*LANE_W);
+    const gpR = trackPos(P_GATE, ((N-1)/2)*LANE_W);
+    const cx = (gpL.x+gpR.x)/2, cz = (gpL.z+gpR.z)/2;
+    // Deer facing direction from gate ry — camera goes IN FRONT of them
+    const gp0 = trackPos(P_GATE, 0);
+    const fx = Math.sin(gp0.ry), fz = Math.cos(gp0.ry); // facing unit vector
+    // SNAP instantly — this is the opening shot, no lerp from old position
+    camPos.set(cx + fx*24, 5, cz + fz*24);
+    camAim.set(cx, 2, cz);
     camera.position.copy(camPos); camera.lookAt(camAim);
-    currentFov+=(targetFov-currentFov)*Math.min(1,dt*3);
-    camera.fov=currentFov; camera.updateProjectionMatrix();
+    camLabel.innerHTML='<span class="rec">●</span> STARTING GATE';
+    currentFov=targetFov=55;
+    camera.fov=55; camera.updateProjectionMatrix();
     return;
   }
 
@@ -775,14 +779,12 @@ function directCamera(dt){
     } else if(prog<0.85){
       // Home stretch approach — head-on low
       if(autoPick!=='headon_low'){ autoPick='headon_low'; autoCutTimer=999; }
+    } else if(prog<0.93){
+      // Final approach — head-on as the pack drives for the wire
+      if(autoPick!=='headon_low'){ autoPick='headon_low'; autoCutTimer=999; }
     } else {
-      // Final approach and crossing — LOCKED to rail at finish line
-      // Rapid cuts between wire and head-on for drama
-      autoCutTimer-=dt;
-      if(autoCutTimer<=0){
-        autoPick=autoPick==='wire'?'headon_low':'wire';
-        autoCutTimer=0.9+Math.random()*0.5;
-      }
+      // Crossing — LOCKED to rail at finish line, deer thunder past
+      if(autoPick!=='wire'){ autoPick='wire'; autoCutTimer=999; }
     }
     mode=autoPick;
   }
@@ -826,10 +828,11 @@ function directCamera(dt){
     camLabel.innerHTML='<span class="rec">●</span> LOW HEAD-ON'; targetFov=30; sm=2.0;
 
   } else if(mode==='wire'){
+    // Rail position at the finish line — slightly downstream so deer cross the frame
     const fp=trackPos(0, 0);
-    tp.set(fp.x + TW + 8, 1.5, fp.z - 2);
-    ta.set(fp.x - TW, 1.5, fp.z + 2);
-    camLabel.innerHTML='<span class="rec">●</span> WIRE CAM'; targetFov=22; sm=8.0;
+    tp.set(fp.x + TW/2 + 6, 1.8, fp.z - 4);
+    ta.set(fp.x - 2, 1.8, fp.z + 1);
+    camLabel.innerHTML='<span class="rec">●</span> WIRE CAM'; targetFov=30; sm=8.0;
 
   } else if(mode==='infield'){
     tp.set(pc.x * 0.3, 1.2, pc.z + 10);
@@ -868,7 +871,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.6</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.7</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
