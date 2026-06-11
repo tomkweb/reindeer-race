@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v5.8</title>
+<title>Reindeer Dash v5.9</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -74,7 +74,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.8</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.9</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -125,7 +125,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v5.8';
+const VERSION='v5.9';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 const ELF_COLORS=['#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#1976d2'];
@@ -588,7 +588,7 @@ function setupDeer(deerScene, runClip, idleClip, idx){
   deerObjs[idx]={
     group:deerScene, mixer, action, idleAct,
     noseGroup, headNode, elf, backBone,
-    laneOff, progress:P_GATE, speed:0,
+    laneOff, curLane:laneOff, progress:P_GATE, speed:0,
     base:0, surgeF:0, surgeP:0, amp:0,
     flightProg:-1, flightDur:0, flightAlt:0, nextFlight:0,
     place:0, finished:false, name:NAMES[idx]
@@ -606,9 +606,11 @@ function configureRace(){
   raceTime=0; finishCounter=0; finishedAll=false; postTimer=0;
   winnerCamActive=false; winnerCamTimer=0; preRace=false;
   gateOpenAnim=0; gateDoors.forEach(h=>h.rotation.x=0); // close doors
+  if(gateGroup && !gateGroup.parent) scene.add(gateGroup); // restore gate if removed mid-race
   deerObjs.forEach(d=>{
     if(!d) return;
     d.progress=P_GATE; d.place=0; d.finished=false;
+    d.curLane=d.laneOff;  // live lane that merges inward during the race
     d.flightProg=-1; d.nextFlight=2.5+Math.random()*4;
     d.base   = 10 + Math.random()*5;
     d.surgeF = 0.45 + Math.random()*1.3;
@@ -658,6 +660,7 @@ function showCountdown(done){
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function leader(){ let b=null; deerObjs.forEach(d=>{ if(d&&(!b||d.progress>b.progress)) b=d; }); return b; }
+function idxOf(d){ return deerObjs.indexOf(d); }
 function topN(n){
   return [...deerObjs].filter(Boolean).sort((a,b)=>b.progress-a.progress).slice(0,n);
 }
@@ -668,12 +671,15 @@ function packXZ(){
   let x=0,z=0; sorted.forEach(d=>{x+=d.group.position.x;z+=d.group.position.z;});
   return{x:x/sorted.length, z:z/sorted.length};
 }
-// Bounding info for top-3 leaders: centre + spread (max distance between them)
+// Bounding info for top-3 leaders: centre + spread. Centre is weighted toward
+// the race leader so the leader is guaranteed prominent in every shot.
 function leadersFrame(){
   const t=topN(3);
   if(t.length===0) return {x:TC_X, z:TC_Z, spread:10};
-  let x=0,z=0; t.forEach(d=>{x+=d.group.position.x; z+=d.group.position.z;});
-  x/=t.length; z/=t.length;
+  // Weighted centre: leader counts double
+  let x=t[0].group.position.x, z=t[0].group.position.z, w=1;
+  t.forEach(d=>{x+=d.group.position.x; z+=d.group.position.z; w++;});
+  x/=w; z/=w;
   let spread=4;
   for(const d of t){
     const dx=d.group.position.x-x, dz=d.group.position.z-z;
@@ -685,6 +691,11 @@ function leadersFrame(){
 // ── UPDATE RACE ───────────────────────────────────────────────────────────────
 function updateRace(dt){
   raceTime+=dt;
+  // Remove gate structure once leaders are halfway (won't be there on return)
+  if(gateGroup && gateGroup.parent){
+    const ldChk=leader();
+    if(ldChk && (ldChk.progress-P_GATE) > 0.625){ scene.remove(gateGroup); }
+  }
   deerObjs.forEach(d=>{
     if(!d) return;
     if(d.finished){
@@ -692,7 +703,7 @@ function updateRace(dt){
       d.speed = Math.max(0, d.speed - dt * 8);
       if(d.speed > 0.1){
         d.progress += d.speed*dt/CIRC;
-        const fp=trackPos(d.progress, d.laneOff);
+        const fp=trackPos(d.progress, d.curLane);
         d.group.position.x=fp.x; d.group.position.z=fp.z;
         d.group.rotation.y=fp.ry; d.group.position.y=0;
       }
@@ -717,7 +728,14 @@ function updateRace(dt){
     }
 
     // Position on oval
-    const sp=trackPos(d.progress, d.laneOff);
+    // Merge toward the inside rail after the start (staggered by lane: inside merges first)
+    const distRun=(d.progress-P_GATE)*CIRC;
+    if(distRun > 15){
+      // target: tight to inside rail with small per-deer spacing to avoid overlap
+      const target=-(TW/2)+1.2+(idxOf(d)%3)*0.9;
+      d.curLane += (target-d.curLane)*Math.min(1, dt*0.35);
+    }
+    const sp=trackPos(d.progress, d.curLane);
     d.group.position.x=sp.x;
     d.group.position.z=sp.z;
     d.group.rotation.y=sp.ry;
@@ -874,13 +892,15 @@ function directCamera(dt){
     camLabel.innerHTML='<span class="rec">●</span> CRANE'; targetFov=48; sm=1.5;
 
   } else if(mode==='blimp'){
-    // Aerial — high enough to show the whole field (uses full pack, not just leaders)
+    // Aerial — high enough to show the whole field, centred between leader and pack
     const all=topN(9);
     let minP=1e9, maxP=-1e9;
     all.forEach(d=>{minP=Math.min(minP,d.progress); maxP=Math.max(maxP,d.progress);});
     const fieldSpread=(maxP-minP)*CIRC;
-    tp.set(pc.x, 45 + fieldSpread*0.5, pc.z);
-    ta.set(pc.x, 0, pc.z + 5);
+    const lf=leadersFrame();
+    const cx=(lf.x+pc.x)/2, cz=(lf.z+pc.z)/2; // midpoint keeps leader well in frame
+    tp.set(cx, 45 + fieldSpread*0.5, cz);
+    ta.set(lf.x, 0, lf.z); // aim at the leaders
     camLabel.innerHTML='<span class="rec">●</span> BLIMP'; targetFov=44; sm=1.0;
 
   } else if(mode==='telephoto'){
@@ -954,7 +974,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.8</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.9</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
