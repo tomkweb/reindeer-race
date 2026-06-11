@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v4.8</title>
+<title>Reindeer Dash v4.9</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -74,7 +74,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v4.8</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v4.9</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -125,7 +125,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v4.8';
+const VERSION='v4.9';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 const ELF_COLORS=['#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#1976d2'];
@@ -847,157 +847,6 @@ function directCamera(dt){
   camPos.lerp(tp,a); camAim.lerp(ta,a);
   camera.position.copy(camPos); camera.lookAt(camAim);
 }
-  // Smooth FOV transitions — telephoto compression / wide angle per shot type
-  currentFov += (targetFov - currentFov) * Math.min(1, dt * 3);
-  if(Math.abs(currentFov - camera.fov) > 0.05){
-    camera.fov = currentFov;
-    camera.updateProjectionMatrix();
-  }
-
-  // Winner cinematic — orbit winner for 4s before results screen
-  if(winnerCamActive){
-    winnerCamTimer += dt;
-    const w = deerObjs.find(d=>d&&d.place===1);
-    if(w){
-      const angle = winnerCamTimer * 0.6;
-      const tp = new THREE.Vector3(
-        w.group.position.x + Math.sin(angle)*8,
-        3.5,
-        w.group.position.z + Math.cos(angle)*8
-      );
-      const a = 1-Math.exp(-3*dt);
-      camPos.lerp(tp, a); camAim.lerp(new THREE.Vector3(w.group.position.x, 2.5, w.group.position.z), a);
-      camera.position.copy(camPos); camera.lookAt(camAim);
-      targetFov = 40;
-      camLabel.innerHTML='<span class=rec>●</span> ' + w.name.toUpperCase() + ' WINS!';
-    }
-    if(winnerCamTimer > 4.0){ winnerCamActive=false; showResults(); }
-    return;
-  }
-
-  let mode=camMode;
-  if(mode==='auto'){
-    const ld=leader();
-    const prog=ld ? Math.min(1,(ld.progress-P_GATE)/1.25) : 0;
-
-    // Kentucky Derby broadcast sequence — mapped to race progress
-    if(raceTime<2.0){
-      // 00:00:01 — Starting gate close-up panning along gate structure
-      autoPick='gate';
-    } else if(prog<0.10){
-      // 00:00:21-00:00:46 — Gate opens, grandstand high-speed tracking through first turn
-      autoPick='grandstand';
-    } else if(prog<0.28){
-      // 00:00:46-00:01:01 — High-angle jib/crane, field geometry settling into rows
-      autoCutTimer-=dt;
-      if(autoCutTimer<=0){
-        const pool=['crane','crane','blimp','grandstand'];
-        let pick; do{pick=pool[Math.floor(Math.random()*pool.length)];}while(pick===autoPick);
-        autoPick=pick; autoCutTimer=3.5+Math.random()*2;
-      }
-    } else if(prog<0.55){
-      // 00:01:01-00:01:10 — Backstretch: vertical aerial blimp showing spacing + infield
-      autoCutTimer-=dt;
-      if(autoCutTimer<=0){
-        const pool=['blimp','blimp','infield','crane','blimp'];
-        let pick; do{pick=pool[Math.floor(Math.random()*pool.length)];}while(pick===autoPick);
-        autoPick=pick; autoCutTimer=3+Math.random()*2;
-      }
-    } else if(prog<0.72){
-      // 00:01:10 — Far turn telephoto: side-angle lens compression, horses stacked
-      if(autoPick!=='telephoto'){ autoPick='telephoto'; autoCutTimer=999; }
-    } else if(prog<0.88){
-      // 00:02:01 — Home stretch: low head-on zoom, closers launching runs
-      if(autoPick!=='headon_low'){ autoPick='headon_low'; autoCutTimer=999; }
-    } else {
-      // 00:02:25 — Wire camera: horizontal tracking locked to finish line plane
-      autoCutTimer-=dt;
-      if(autoCutTimer<=0){
-        autoPick=autoPick==='wire'?'headon_low':'wire';
-        autoCutTimer=1.0+Math.random()*0.6;
-      }
-    }
-    mode=autoPick;
-  }
-
-  const ld=leader(), pc=packXZ();
-  // Normalize progress: 0 = gate, 1 = finish (race fraction 0..1)
-  const raceFrac = ld ? Math.min(1,(ld.progress - P_GATE) / 1.25) : 0;
-  const prog = raceFrac;
-  let tp=new THREE.Vector3(), ta=new THREE.Vector3(), sm=2.2;
-  targetFov=54; // default — overridden per camera
-
-  if(mode==='gate'){
-    // 00:00:01 — Tight panning along starting gate, individual animals visible
-    // Wide angle, low, slightly to the side of the starting area
-    const gp = trackPos(0.01, TW/2+2);
-    tp.set(gp.x+4, 2.5, gp.z-6);
-    ta.set(gp.x-2, 1.8, gp.z+4);
-    camLabel.innerHTML='<span class=rec>●</span> STARTING GATE';
-    targetFov=70; sm=1.5;
-
-  } else if(mode==='grandstand'){
-    // 00:00:26 — High-speed grandstand tracking parallel to homestretch
-    // Camera on outer side of homestretch, eye-level, following the pack
-    const sp=trackPos(Math.min(prog+0.02,0.25), TW/2+14);
-    tp.set(sp.x, 4.0, sp.z);
-    ta.set(pc.x, 2.0, pc.z+6);
-    camLabel.innerHTML='<span class=rec>●</span> GRANDSTAND TRACK'; sm=2.8;
-
-  } else if(mode==='crane'){
-    // 00:00:46 — High jib/crane pan showing field geometry
-    const h=38-prog*18;
-    tp.set(TC_X+15, Math.max(20,h), TC_Z-20);
-    ta.set(pc.x, 1.5, pc.z+10);
-    camLabel.innerHTML='<span class=rec>●</span> CRANE'; targetFov=48; sm=1.8;
-
-  } else if(mode==='blimp'){
-    // 00:01:01 — Near top-down vertical aerial blimp, shows absolute spacing
-    tp.set(pc.x*0.1, 55, pc.z*0.9);
-    ta.set(pc.x*0.1, 0, pc.z+5);
-    camLabel.innerHTML='<span class=rec>●</span> BLIMP'; targetFov=38; sm=1.2;
-
-  } else if(mode==='telephoto'){
-    // 00:01:10 — Side-angle telephoto on far turn, lens compression stacks horses
-    // Far from pack, very narrow FOV = compression effect makes field look tightly bunched
-    const inTop=prog>0.4&&prog<0.60;
-    const camZ = inTop ? STR+TR*0.8 : -TR*0.8;
-    tp.set(TC_X+55, 8, camZ);
-    ta.set(pc.x, 2.5, pc.z);
-    camLabel.innerHTML='<span class=rec>●</span> TELEPHOTO'; targetFov=18; sm=1.5;
-
-  } else if(mode==='headon_low'){
-    // 00:02:01 — Ground-level head-on zoom facing oncoming horses (very dramatic)
-    if(ld){
-      const ahead=trackPos(ld.progress+0.07*1.25, 0);
-      tp.set(ahead.x, 0.9, ahead.z);
-      ta.set(pc.x, 1.5, pc.z);
-    }
-    camLabel.innerHTML='<span class=rec>●</span> LOW HEAD-ON'; targetFov=28; sm=1.6;
-
-  } else if(mode==='wire'){
-    // 00:02:25 — Wire camera: horizontal tracking locked to finish line plane
-    // Lightning-fast side shot, very low, locked to finish Z
-    const fp=trackPos(0,0);
-    tp.set(fp.x + TW/2 + 12, 1.0, fp.z);
-    ta.set(fp.x - TW/2, 1.0, fp.z);
-    camLabel.innerHTML='<span class=rec>●</span> WIRE CAM'; targetFov=22; sm=5.0;
-
-  } else if(mode==='infield'){
-    // Inside the oval, low — horses thunder past
-    tp.set(pc.x*.2, 0.9, pc.z+6); ta.set(pc.x*.2+5, 2.5, pc.z-8);
-    camLabel.innerHTML='<span class=rec>●</span> INFIELD'; sm=3.5;
-
-  } else {
-    // Fallback: aerial
-    tp.set(TR, 300, STR*0.5); ta.set(0, 0, STR*0.5);
-    camLabel.innerHTML='<span class="rec">●</span> AERIAL'; targetFov=54; sm=1.2;
-  }
-
-  const a=1-Math.exp(-sm*dt);
-  camPos.lerp(tp,a); camAim.lerp(ta,a);
-  camera.position.copy(camPos); camera.lookAt(camAim);
-}
 
 // ── RESULTS ───────────────────────────────────────────────────────────────────
 function showResults(){
@@ -1017,7 +866,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v4.8</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v4.9</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
