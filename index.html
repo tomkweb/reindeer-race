@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v5.2</title>
+<title>Reindeer Dash v5.3</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -74,7 +74,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.2</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.3</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -125,7 +125,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v5.2';
+const VERSION='v5.3';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 const ELF_COLORS=['#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#1976d2'];
@@ -214,8 +214,8 @@ let camMode='auto', autoPick='gate', autoCutTimer=0;
 let targetFov=54, currentFov=54; // smooth FOV transitions for telephoto effect
 let winnerCamActive=false, winnerCamTimer=0;
 let snowGeo;
-const camPos = new THREE.Vector3(TC_X, 55, TC_Z - 60);
-const camAim = new THREE.Vector3(TC_X, 0,  TC_Z);
+const camPos = new THREE.Vector3(TC_X + 80, 80, TC_Z - 150);
+const camAim = new THREE.Vector3(TC_X, 0, TC_Z);
 
 const overlay   = document.getElementById('overlay');
 const loadBar   = document.getElementById('loadBar');
@@ -298,7 +298,7 @@ function init(){
 // ── GROUND ────────────────────────────────────────────────────────────────────
 function buildGround(){
   const g = new THREE.Mesh(
-    new THREE.PlaneGeometry(600, 600),
+    new THREE.PlaneGeometry(2400, 2400),
     new THREE.MeshStandardMaterial({color: 0xddeeff, roughness: 0.95})
   );
   g.rotation.x = -Math.PI/2;
@@ -370,14 +370,13 @@ function makeTree(x, z, s){
   return g;
 }
 function buildScenery(){
-  const outerR = TR + TW/2 + 5;
-  for(let i=0;i<50;i++){
+  // Trees scattered outside the oval — scale up for 1-mile track
+  for(let i=0;i<80;i++){
     const ang = Math.random()*Math.PI*2;
-    const r   = outerR + 8 + Math.random()*55;
-    // Stretch the ellipse to match the oval shape
+    const r   = TR + TW/2 + 20 + Math.random()*200;
     const x   = Math.cos(ang) * r;
-    const z   = TC_Z + Math.sin(ang) * r * 1.6;
-    scene.add(makeTree(x, z, 0.7+Math.random()*1.5));
+    const z   = TC_Z + Math.sin(ang) * r * 1.8;
+    scene.add(makeTree(x, z, 2+Math.random()*4));
   }
 }
 
@@ -872,7 +871,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.2</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.3</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
