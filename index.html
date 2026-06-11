@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v5.5</title>
+<title>Reindeer Dash v5.6</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -74,7 +74,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.5</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.6</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -125,7 +125,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v5.5';
+const VERSION='v5.6';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 const ELF_COLORS=['#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#1976d2'];
@@ -615,6 +615,7 @@ function leader(){ let b=null; deerObjs.forEach(d=>{ if(d&&(!b||d.progress>b.pro
 function packXZ(){
   // Average position of top 4 leaders for camera tracking
   const sorted=[...deerObjs].filter(Boolean).sort((a,b)=>b.progress-a.progress).slice(0,4);
+  if(sorted.length===0) return {x:TC_X, z:TC_Z}; // guard: no deer loaded yet
   let x=0,z=0; sorted.forEach(d=>{x+=d.group.position.x;z+=d.group.position.z;});
   return{x:x/sorted.length, z:z/sorted.length};
 }
@@ -843,6 +844,9 @@ function directCamera(dt){
 
   const a=1-Math.exp(-sm*dt);
   camPos.lerp(tp,a); camAim.lerp(ta,a);
+  // NaN recovery — never let a poisoned lerp stick
+  if(!isFinite(camPos.x)||!isFinite(camPos.y)||!isFinite(camPos.z)){ camPos.copy(tp); }
+  if(!isFinite(camAim.x)||!isFinite(camAim.y)||!isFinite(camAim.z)){ camAim.copy(ta); }
   camera.position.copy(camPos); camera.lookAt(camAim);
 }
 
@@ -864,7 +868,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.5</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.6</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
