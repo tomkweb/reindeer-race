@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v5.7</title>
+<title>Reindeer Dash v5.8</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -68,13 +68,13 @@ canvas{display:block;}
   <button data-cam="blimp">Blimp</button>
   <button data-cam="telephoto">Tele</button>
   <button data-cam="headon_low">Head-On</button>
-  <button data-cam="wire">Wire</button>
+  <button data-cam="drone">Drone</button>
   <button data-cam="infield">Infield</button>
 </div>
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.7</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.8</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -125,7 +125,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v5.7';
+const VERSION='v5.8';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 const ELF_COLORS=['#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#1976d2'];
@@ -255,6 +255,7 @@ function init(){
 
   buildGround();
   buildScenery();
+  buildStartingGate();
   buildSnow();
   loadAllDeer();        // ← start loading models immediately
   buildOvalTrack();     // ← build track geometry after
@@ -378,6 +379,49 @@ function buildScenery(){
     const z   = TC_Z + Math.sin(ang) * r * 1.6;
     scene.add(makeTree(x, z, 0.7+Math.random()*1.5));
   }
+}
+
+// ── STARTING GATE ─────────────────────────────────────────────────────────────
+let gateGroup=null, gateDoors=[], gateOpenAnim=0;
+function buildStartingGate(){
+  gateGroup=new THREE.Group();
+  const gp=trackPos(P_GATE,0);
+  const frameM=new THREE.MeshStandardMaterial({color:0x2e7d32,roughness:.6});
+  const doorM =new THREE.MeshStandardMaterial({color:0xc62828,roughness:.5});
+  const W=N*LANE_W+1.2;   // gate width spanning all lanes
+  const H=3.2;            // gate height
+  // Top beam
+  const beam=new THREE.Mesh(new THREE.BoxGeometry(W,0.35,0.5),frameM);
+  beam.position.y=H; gateGroup.add(beam);
+  // End posts + lane dividers
+  for(let i=0;i<=N;i++){
+    const px=-W/2+0.6+i*LANE_W;
+    const post=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,H,8),frameM);
+    post.position.set(px,H/2,0); gateGroup.add(post);
+  }
+  // Doors — one per lane, hinged at top, swing up when opened
+  gateDoors=[];
+  for(let i=0;i<N;i++){
+    const px=-W/2+0.6+i*LANE_W+LANE_W/2;
+    const hinge=new THREE.Group();
+    hinge.position.set(px,H-0.4,0);
+    const door=new THREE.Mesh(new THREE.BoxGeometry(LANE_W-0.25,H-1.0,0.08),doorM);
+    door.position.y=-(H-1.0)/2;
+    hinge.add(door);
+    gateGroup.add(hinge);
+    gateDoors.push(hinge);
+  }
+  // Position and orient at the gate location, facing direction of travel
+  gateGroup.position.set(gp.x,0,gp.z);
+  gateGroup.rotation.y=gp.ry;
+  scene.add(gateGroup);
+}
+function updateGateDoors(dt){
+  if(gateOpenAnim<=0) return;
+  gateOpenAnim=Math.max(0,gateOpenAnim-dt);
+  const t=1-(gateOpenAnim/0.4); // 0→1 over 0.4s
+  const ang=t*Math.PI*0.55;     // swing up ~100°
+  gateDoors.forEach(h=>h.rotation.x=ang);
 }
 
 // ── SNOW ──────────────────────────────────────────────────────────────────────
@@ -561,6 +605,7 @@ function setupDeer(deerScene, runClip, idleClip, idx){
 function configureRace(){
   raceTime=0; finishCounter=0; finishedAll=false; postTimer=0;
   winnerCamActive=false; winnerCamTimer=0; preRace=false;
+  gateOpenAnim=0; gateDoors.forEach(h=>h.rotation.x=0); // close doors
   deerObjs.forEach(d=>{
     if(!d) return;
     d.progress=P_GATE; d.place=0; d.finished=false;
@@ -590,6 +635,7 @@ function beginRace(){
   // After PRE_RACE_DUR, show countdown then open gates
   setTimeout(()=>{
     showCountdown(()=>{ preRace=false; racing=true;
+      gateOpenAnim=0.4; // doors fly open
       deerObjs.forEach(d=>{ if(!d) return;
         d.idleAct.stop(); d.action.reset().play(); d.action.paused=false;
       });
@@ -612,12 +658,28 @@ function showCountdown(done){
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function leader(){ let b=null; deerObjs.forEach(d=>{ if(d&&(!b||d.progress>b.progress)) b=d; }); return b; }
+function topN(n){
+  return [...deerObjs].filter(Boolean).sort((a,b)=>b.progress-a.progress).slice(0,n);
+}
 function packXZ(){
   // Average position of top 4 leaders for camera tracking
-  const sorted=[...deerObjs].filter(Boolean).sort((a,b)=>b.progress-a.progress).slice(0,4);
-  if(sorted.length===0) return {x:TC_X, z:TC_Z}; // guard: no deer loaded yet
+  const sorted=topN(4);
+  if(sorted.length===0) return {x:TC_X, z:TC_Z};
   let x=0,z=0; sorted.forEach(d=>{x+=d.group.position.x;z+=d.group.position.z;});
   return{x:x/sorted.length, z:z/sorted.length};
+}
+// Bounding info for top-3 leaders: centre + spread (max distance between them)
+function leadersFrame(){
+  const t=topN(3);
+  if(t.length===0) return {x:TC_X, z:TC_Z, spread:10};
+  let x=0,z=0; t.forEach(d=>{x+=d.group.position.x; z+=d.group.position.z;});
+  x/=t.length; z/=t.length;
+  let spread=4;
+  for(const d of t){
+    const dx=d.group.position.x-x, dz=d.group.position.z-z;
+    spread=Math.max(spread, Math.hypot(dx,dz)*2);
+  }
+  return {x, z, spread};
 }
 
 // ── UPDATE RACE ───────────────────────────────────────────────────────────────
@@ -779,12 +841,9 @@ function directCamera(dt){
     } else if(prog<0.85){
       // Home stretch approach — head-on low
       if(autoPick!=='headon_low'){ autoPick='headon_low'; autoCutTimer=999; }
-    } else if(prog<0.93){
-      // Final approach — head-on as the pack drives for the wire
-      if(autoPick!=='headon_low'){ autoPick='headon_low'; autoCutTimer=999; }
     } else {
-      // Crossing — LOCKED to rail at finish line, deer thunder past
-      if(autoPick!=='wire'){ autoPick='wire'; autoCutTimer=999; }
+      // After final turn — DRONE shot tracks leaders to and across the wire
+      if(autoPick!=='drone'){ autoPick='drone'; autoCutTimer=999; }
     }
     mode=autoPick;
   }
@@ -800,43 +859,67 @@ function directCamera(dt){
     camLabel.innerHTML='<span class="rec">●</span> STARTING GATE'; targetFov=55; sm=1.5;
 
   } else if(mode==='grandstand'){
-    tp.set(pc.x + TR + TW + 8, 4, pc.z);
-    ta.set(pc.x, 2, pc.z);
+    // Side tracking — distance scales with leader spread (tight when bunched, wide when spread)
+    const lf=leadersFrame();
+    const dist = 8 + lf.spread*0.9;
+    tp.set(lf.x + TR + TW/2 + dist, 3+lf.spread*0.15, lf.z);
+    ta.set(lf.x, 2, lf.z);
     camLabel.innerHTML='<span class="rec">●</span> GRANDSTAND'; sm=2.5;
 
   } else if(mode==='crane'){
-    tp.set(pc.x + 10, 40, pc.z - 25);
-    ta.set(pc.x, 0, pc.z + 8);
+    // High crane — frames leaders, zooms with spread
+    const lf=leadersFrame();
+    tp.set(lf.x + 12, 25 + lf.spread*0.8, lf.z - (18 + lf.spread*0.6));
+    ta.set(lf.x, 0, lf.z + 5);
     camLabel.innerHTML='<span class="rec">●</span> CRANE'; targetFov=48; sm=1.5;
 
   } else if(mode==='blimp'){
-    tp.set(pc.x, 70, pc.z);
-    ta.set(pc.x, 0, pc.z + 8);
-    camLabel.innerHTML='<span class="rec">●</span> BLIMP'; targetFov=38; sm=1.0;
+    // Aerial — high enough to show the whole field (uses full pack, not just leaders)
+    const all=topN(9);
+    let minP=1e9, maxP=-1e9;
+    all.forEach(d=>{minP=Math.min(minP,d.progress); maxP=Math.max(maxP,d.progress);});
+    const fieldSpread=(maxP-minP)*CIRC;
+    tp.set(pc.x, 45 + fieldSpread*0.5, pc.z);
+    ta.set(pc.x, 0, pc.z + 5);
+    camLabel.innerHTML='<span class="rec">●</span> BLIMP'; targetFov=44; sm=1.0;
 
   } else if(mode==='telephoto'){
-    tp.set(pc.x + TR + TW + 45, 6, pc.z);
-    ta.set(pc.x, 2, pc.z);
-    camLabel.innerHTML='<span class="rec">●</span> TELEPHOTO'; targetFov=14; sm=1.5;
+    // Long lens on the leaders — compression effect
+    const lf=leadersFrame();
+    tp.set(lf.x + TR + TW + 45, 5, lf.z);
+    ta.set(lf.x, 2, lf.z);
+    camLabel.innerHTML='<span class="rec">●</span> TELEPHOTO';
+    targetFov=Math.max(10, Math.min(20, lf.spread*1.1)); sm=1.5;
 
   } else if(mode==='headon_low'){
+    // Ground level facing oncoming leaders
+    const lf=leadersFrame();
     if(ld){
-      const ahead=trackPos(ld.progress + 0.06, 0);
+      const ahead=trackPos(ld.progress + 0.05, 0);
       tp.set(ahead.x, 1.2, ahead.z);
-      ta.set(pc.x, 2, pc.z);
+      ta.set(lf.x, 2, lf.z);
     }
-    camLabel.innerHTML='<span class="rec">●</span> LOW HEAD-ON'; targetFov=30; sm=2.0;
+    camLabel.innerHTML='<span class="rec">●</span> LOW HEAD-ON';
+    targetFov=Math.max(22, Math.min(40, lf.spread*2)); sm=2.0;
+
+  } else if(mode==='drone'){
+    // Drone tracks leaders after the final turn — flies alongside and slightly above,
+    // gliding with them to and across the finish line
+    const lf=leadersFrame();
+    tp.set(lf.x + 9 + lf.spread*0.5, 6 + lf.spread*0.3, lf.z - 9);
+    ta.set(lf.x, 1.8, lf.z + 2);
+    camLabel.innerHTML='<span class="rec">●</span> DRONE'; targetFov=42; sm=3.2;
 
   } else if(mode==='wire'){
-    // Rail position at the finish line — slightly downstream so deer cross the frame
     const fp=trackPos(0, 0);
     tp.set(fp.x + TW/2 + 6, 1.8, fp.z - 4);
     ta.set(fp.x - 2, 1.8, fp.z + 1);
     camLabel.innerHTML='<span class="rec">●</span> WIRE CAM'; targetFov=30; sm=8.0;
 
   } else if(mode==='infield'){
-    tp.set(pc.x * 0.3, 1.2, pc.z + 10);
-    ta.set(pc.x, 3, pc.z - 8);
+    const lf=leadersFrame();
+    tp.set(lf.x * 0.3, 1.2, lf.z + 10 + lf.spread*0.4);
+    ta.set(lf.x, 3, lf.z - 5);
     camLabel.innerHTML='<span class="rec">●</span> INFIELD'; sm=3.0;
 
   } else {
@@ -871,7 +954,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.7</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.8</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
@@ -968,6 +1051,7 @@ function animate(){
   for(let i=0;i<sp.count;i++){ let y=sp.getY(i)-11*dt; if(y<0)y=65; sp.setY(i,y); }
   sp.needsUpdate=true;
   if(racing) updateRace(dt);
+  updateGateDoors(dt);
   if(calActive) updateCalCamera(); else directCamera(dt);
   renderer.render(scene, camera);
 }
