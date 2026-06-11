@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v5.0</title>
+<title>Reindeer Dash v5.1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -74,7 +74,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.0</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.1</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -125,7 +125,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v5.0';
+const VERSION='v5.1';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 const ELF_COLORS=['#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#1976d2'];
@@ -379,18 +379,6 @@ function buildScenery(){
     const z   = TC_Z + Math.sin(ang) * r * 1.6;
     scene.add(makeTree(x, z, 0.7+Math.random()*1.5));
   }
-  for(let i=0;i<10;i++){
-    const m = new THREE.Mesh(
-      new THREE.ConeGeometry(35+Math.random()*30, 40+Math.random()*40, 5),
-      new THREE.MeshStandardMaterial({color:0xb0c4de,roughness:1})
-    );
-    m.position.set(
-      (Math.random()-.5)*500,
-      0,
-      TC_Z + (160+Math.random()*80)*(Math.random()<.5?1:-1)
-    );
-    scene.add(m);
-  }
 }
 
 // ── SNOW ──────────────────────────────────────────────────────────────────────
@@ -625,7 +613,12 @@ function showCountdown(done){
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function leader(){ let b=null; deerObjs.forEach(d=>{ if(d&&(!b||d.progress>b.progress)) b=d; }); return b; }
-function packXZ(){ let x=0,z=0,n=0; deerObjs.forEach(d=>{ if(d){x+=d.group.position.x;z+=d.group.position.z;n++;} }); return{x:x/(n||1),z:z/(n||1)}; }
+function packXZ(){
+  // Average position of top 4 leaders for camera tracking
+  const sorted=[...deerObjs].filter(Boolean).sort((a,b)=>b.progress-a.progress).slice(0,4);
+  let x=0,z=0; sorted.forEach(d=>{x+=d.group.position.x;z+=d.group.position.z;});
+  return{x:x/sorted.length, z:z/sorted.length};
+}
 
 // ── UPDATE RACE ───────────────────────────────────────────────────────────────
 function updateRace(dt){
@@ -866,7 +859,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.0</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.1</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
