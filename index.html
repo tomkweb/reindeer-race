@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v5.4</title>
+<title>Reindeer Dash v5.5</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -74,7 +74,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.4</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.5</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -125,7 +125,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v5.4';
+const VERSION='v5.5';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 const ELF_COLORS=['#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#1976d2'];
@@ -729,9 +729,16 @@ function directCamera(dt){
   // Pre-race: all deer head-on in the gate
   if(preRace){
     const gp = trackPos(P_GATE, 0);
-    tp.set(gp.x, 3, gp.z - 12);
-    ta.set(gp.x, 1.5, gp.z + 5);
-    camLabel.innerHTML='<span class="rec">●</span> STARTING GATE'; targetFov=55; sm=1.5;
+    const tp = new THREE.Vector3(gp.x, 3, gp.z - 12);
+    const ta = new THREE.Vector3(gp.x, 1.5, gp.z + 5);
+    camLabel.innerHTML='<span class="rec">●</span> STARTING GATE';
+    targetFov=55;
+    const a=1-Math.exp(-2*dt);
+    camPos.lerp(tp,a); camAim.lerp(ta,a);
+    camera.position.copy(camPos); camera.lookAt(camAim);
+    currentFov+=(targetFov-currentFov)*Math.min(1,dt*3);
+    camera.fov=currentFov; camera.updateProjectionMatrix();
+    return;
   }
 
   let mode=camMode;
@@ -857,7 +864,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.4</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v5.5</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
