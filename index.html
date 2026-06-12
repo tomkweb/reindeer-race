@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v6.2</title>
+<title>Reindeer Dash v6.3</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -74,7 +74,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v6.2</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v6.3</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -125,10 +125,12 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v6.2';
+const VERSION='v6.3';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
-const ELF_COLORS=['#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#c62828','#2e7d32','#1976d2'];
+// Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
+const SILKS=['#e53935','#1e88e5','#43a047','#fdd835','#8e24aa','#fb8c00','#00acc1','#ec407a','#f5f5f5'];
+const ELF_COLORS=SILKS;
 const N=9, LANE_W=1.6, BASE_SPEED=3.0;
 
 // ── OVAL TRACK GEOMETRY ───────────────────────────────────────────────────────
@@ -568,6 +570,24 @@ function setupDeer(deerScene, runClip, idleClip, idx){
 
   // Elf
   const elf=makeElf(ELF_COLORS[idx]);
+  // Saddle cloth in silk colour under the elf
+  const cloth=new THREE.Mesh(
+    new THREE.BoxGeometry(.55,.06,.85),
+    new THREE.MeshStandardMaterial({color:SILKS[idx],roughness:.8}));
+  cloth.position.y=-.24;
+  elf.add(cloth);
+  // Floating name tag — canvas sprite, always faces camera
+  const cv=document.createElement('canvas'); cv.width=256; cv.height=64;
+  const cx2=cv.getContext('2d');
+  cx2.fillStyle=SILKS[idx];
+  cx2.beginPath(); cx2.roundRect(4,6,248,52,26); cx2.fill();
+  cx2.fillStyle=(idx===3||idx===8)?'#222':'#fff'; // dark text on yellow/white
+  cx2.font='bold 34px sans-serif'; cx2.textAlign='center'; cx2.textBaseline='middle';
+  cx2.fillText(NAMES[idx],128,33);
+  const tagTex=new THREE.CanvasTexture(cv);
+  const tag=new THREE.Sprite(new THREE.SpriteMaterial({map:tagTex,depthTest:false,transparent:true,opacity:.92}));
+  tag.scale.set(3.4,.85,1);
+  scene.add(tag); // world space — tracked per frame
   elf.scale.setScalar(2.2);
   scene.add(elf);
 
@@ -587,7 +607,7 @@ function setupDeer(deerScene, runClip, idleClip, idx){
 
   deerObjs[idx]={
     group:deerScene, mixer, action, idleAct,
-    noseGroup, headNode, elf, backBone,
+    noseGroup, headNode, elf, backBone, tag,
     laneOff, curLane:laneOff, progress:P_GATE, speed:0,
     base:0, surgeF:0, surgeP:0, amp:0,
     flightProg:-1, flightDur:0, flightAlt:0, nextFlight:0,
@@ -697,14 +717,21 @@ function packXZ(){
 function leadersFrame(){
   const t=topN(3);
   if(t.length===0) return {x:TC_X, z:TC_Z, spread:10};
-  // Weighted centre: leader counts triple — camera never loses the leader
-  let x=t[0].group.position.x*3, z=t[0].group.position.z*3, w=3;
-  t.forEach(d=>{x+=d.group.position.x; z+=d.group.position.z; w++;});
+  // LAG COMPENSATION: use each leader's PREDICTED position 0.4s ahead so the
+  // camera's smoothing lag never lets the leader escape the frame.
+  const pred = d => {
+    const p = d.finished ? d.progress : d.progress + d.speed*0.4/CIRC;
+    return trackPos(p, d.curLane!==undefined?d.curLane:d.laneOff);
+  };
+  // Weighted centre: leader counts triple
+  const lp = pred(t[0]);
+  let x=lp.x*3, z=lp.z*3, w=3;
+  t.forEach(d=>{ const pp=pred(d); x+=pp.x; z+=pp.z; w++; });
   x/=w; z/=w;
   let spread=4;
   for(const d of t){
-    const dx=d.group.position.x-x, dz=d.group.position.z-z;
-    spread=Math.max(spread, Math.hypot(dx,dz)*2);
+    const pp=pred(d);
+    spread=Math.max(spread, Math.hypot(pp.x-x, pp.z-z)*2);
   }
   return {x, z, spread};
 }
@@ -799,6 +826,7 @@ function updateRace(dt){
     if(!d||!d.elf) return;
     if(d.backBone){ d.backBone.getWorldPosition(_v); d.elf.position.copy(_v); d.elf.position.y+=0.9; }
     else { d.elf.position.set(d.group.position.x, d.group.position.y+2.8, d.group.position.z); }
+    if(d.tag){ d.tag.position.set(d.group.position.x, d.group.position.y+5.4, d.group.position.z); }
     d.elf.rotation.y=d.group.rotation.y;
   });
 
@@ -1009,7 +1037,7 @@ function showResults(){
   const order=[...deerObjs].filter(Boolean).sort((a,b)=>a.place-b.place);
   const rows=order.map(d=>`<div class="rrow">
     <span class="pos">${d.place}</span>
-    <span class="swatch" style="background:${COLORS[NAMES.indexOf(d.name)]}"></span>
+    <span class="swatch" style="background:${SILKS[NAMES.indexOf(d.name)]}"></span>
     <span class="nm">${d.name}${d.name==='Rudolph'?' 🔴':''}</span>
   </div>`).join('');
   // Photo finish strip — noses at the line
@@ -1030,7 +1058,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v6.2</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v6.3</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
