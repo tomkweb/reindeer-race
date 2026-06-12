@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v6.5</title>
+<title>Reindeer Dash v6.6</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -74,7 +74,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v6.5</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v6.6</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -125,7 +125,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v6.5';
+const VERSION='v6.6';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -1033,15 +1033,13 @@ function directCamera(dt){
     }
 
   } else if(mode==='wire'){
-    // STATIC finish-line shot — fixed framing: the line in frame,
-    // deer run in and across. Camera locked (constant target).
-    const fp=trackPos(0, 0);
-    const bk=trackPos(40/CIRC, 0); // a point 40m up the approach
-    let ax=bk.x-fp.x, az=bk.z-fp.z;
-    const L=Math.hypot(ax,az); ax/=L; az/=L;   // approach unit vector
-    tp.set(fp.x - ax*16 + (TW/2+9), 5, fp.z - az*16);
-    ta.set(fp.x + ax*14, 1.2, fp.z + az*14);
-    camLabel.innerHTML='<span class="rec">●</span> FINISH LINE'; targetFov=40; sm=9.0;
+    // STATIC side-on finish shot — line frozen at the RIGHT edge of frame,
+    // deer enter from the LEFT and run across it. Camera locked.
+    const cp=trackPos(-11/CIRC, TW/2+15); // 11m past the line, outside rail
+    const aim=trackPos(-9/CIRC, 0);       // aim 9m past the line → line at RIGHT edge
+    tp.set(cp.x, 3.2, cp.z);
+    ta.set(aim.x, 1.5, aim.z);
+    camLabel.innerHTML='<span class="rec">●</span> FINISH LINE'; targetFov=46; sm=9.0;
 
   } else if(mode==='infield'){
     const lf=leadersFrame();
@@ -1091,7 +1089,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v6.5</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v6.6</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
