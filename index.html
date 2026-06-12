@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v6.4</title>
+<title>Reindeer Dash v6.5</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -74,7 +74,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v6.4</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v6.5</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -125,7 +125,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v6.4';
+const VERSION='v6.5';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -356,7 +356,7 @@ function buildOvalTrack(){
   const ban=new THREE.Mesh(new THREE.BoxGeometry(TW+4,2.2,.25),
     new THREE.MeshBasicMaterial({map:banTex}));
   ban.position.set(fp.x,8.5,fp.z);
-  ban.rotation.y=fp.ry-Math.PI/2;
+  ban.rotation.y=fp.ry;
   scene.add(ban);
   // Checkered finish strip across the track — high contrast, unmissable
   const ccv=document.createElement('canvas'); ccv.width=256; ccv.height=64;
@@ -368,7 +368,7 @@ function buildOvalTrack(){
   const chkTex=new THREE.CanvasTexture(ccv);
   const stripe=new THREE.Mesh(new THREE.BoxGeometry(TW+4,.06,2.2),
     new THREE.MeshBasicMaterial({map:chkTex}));
-  stripe.rotation.y=fp.ry-Math.PI/2;
+  stripe.rotation.y=fp.ry;
   stripe.position.set(fp.x,.04,fp.z);
   scene.add(stripe);
 }
@@ -881,16 +881,17 @@ function directCamera(dt){
     winnerCamTimer += dt;
     const w = deerObjs.find(d=>d&&d.place===1);
     if(w){
-      const angle = winnerCamTimer * 0.6;
-      const tp = new THREE.Vector3(
-        w.group.position.x + Math.sin(angle)*18,
-        5, w.group.position.z + Math.cos(angle)*18);
+      // Mingling shot — slow wide orbit around the pack as they mill about
+      const pk = packXZ();
+      const cx=(pk.x+w.group.position.x)/2, cz=(pk.z+w.group.position.z)/2;
+      const angle = winnerCamTimer * 0.45;
+      const tp = new THREE.Vector3(cx + Math.sin(angle)*24, 7, cz + Math.cos(angle)*24);
       const a = 1-Math.exp(-3*dt);
-      camPos.lerp(tp,a); camAim.lerp(new THREE.Vector3(w.group.position.x,2.5,w.group.position.z),a);
+      camPos.lerp(tp,a); camAim.lerp(new THREE.Vector3(cx,2,cz),a);
       camera.position.copy(camPos); camera.lookAt(camAim);
-      targetFov=40; camLabel.innerHTML='<span class="rec">●</span> '+w.name.toUpperCase()+' WINS!';
+      targetFov=44; camLabel.innerHTML='<span class="rec">●</span> '+w.name.toUpperCase()+' WINS!';
     }
-    if(winnerCamTimer>4.0){ winnerCamActive=false; showResults(); }
+    if(winnerCamTimer>5.0){ winnerCamActive=false; showResults(); }
     return;
   }
 
@@ -946,9 +947,12 @@ function directCamera(dt){
     } else if(prog<0.85){
       // Home stretch approach — head-on low
       if(autoPick!=='headon_low'){ autoPick='headon_low'; autoCutTimer=999; }
-    } else {
-      // After final turn — DRONE shot tracks leaders to and across the wire
+    } else if(prog<0.88){
+      // Off the final turn — drone glides with the leaders
       if(autoPick!=='drone'){ autoPick='drone'; autoCutTimer=999; }
+    } else {
+      // Final approach + crossing — LOCKED static finish-line shot
+      if(autoPick!=='wire'){ autoPick='wire'; autoCutTimer=999; }
     }
     mode=autoPick;
   }
@@ -1029,12 +1033,15 @@ function directCamera(dt){
     }
 
   } else if(mode==='wire'){
-    // Rail at the finish line — aims at the leader as they approach
+    // STATIC finish-line shot — fixed framing: the line in frame,
+    // deer run in and across. Camera locked (constant target).
     const fp=trackPos(0, 0);
-    const lf=leadersFrame();
-    tp.set(fp.x + TW/2 + 6, 1.8, fp.z - 4);
-    ta.set(lf.x, 1.8, lf.z);
-    camLabel.innerHTML='<span class="rec">●</span> WIRE CAM'; targetFov=30; sm=8.0;
+    const bk=trackPos(40/CIRC, 0); // a point 40m up the approach
+    let ax=bk.x-fp.x, az=bk.z-fp.z;
+    const L=Math.hypot(ax,az); ax/=L; az/=L;   // approach unit vector
+    tp.set(fp.x - ax*16 + (TW/2+9), 5, fp.z - az*16);
+    ta.set(fp.x + ax*14, 1.2, fp.z + az*14);
+    camLabel.innerHTML='<span class="rec">●</span> FINISH LINE'; targetFov=40; sm=9.0;
 
   } else if(mode==='infield'){
     const lf=leadersFrame();
@@ -1084,7 +1091,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v6.4</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v6.5</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
