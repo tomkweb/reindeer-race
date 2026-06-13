@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v6.7</title>
+<title>Reindeer Dash v6.8</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -74,7 +74,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v6.7</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v6.8</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -125,7 +125,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v6.7';
+const VERSION='v6.8';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -137,9 +137,9 @@ const N=9, LANE_W=1.6, BASE_SPEED=3.0;
 // Layout: homestretch on right (X=+TR), backstretch on left (X=-TR)
 // Reindeer run counterclockwise viewed from above (US racing standard).
 // Visual scale kept small so deer are visible; race runs 1.25 laps = 1.25 miles
-const STR  = 160;                       // straight length (m) — doubled
-const TR   = 60;                        // turn radius (m) — doubled
-const CIRC = 2*STR + 2*Math.PI*TR;     // full lap ≈ 697m
+const STR  = 320;                       // straight length (m)
+const TR   = 120;                       // turn radius (m)
+const CIRC = 2*STR + 2*Math.PI*TR;     // full lap ≈ 1394m
 const TW   = 14;                        // track width (m)
 
 // Segment arc-length boundaries
@@ -374,6 +374,7 @@ function buildOvalTrack(){
   ban.position.set(fp.x,8.5,fp.z);
   ban.rotation.y=fp.ry;
   scene.add(ban);
+  finishLineGroup.push(ban);
   // Checkered finish strip across the track — high contrast, unmissable
   const ccv=document.createElement('canvas'); ccv.width=256; ccv.height=64;
   const ccx=ccv.getContext('2d');
@@ -387,6 +388,7 @@ function buildOvalTrack(){
   stripe.rotation.y=fp.ry;
   stripe.position.set(fp.x,.04,fp.z);
   scene.add(stripe);
+  finishLineGroup.push(stripe);
 }
 
 // ── SCENERY ───────────────────────────────────────────────────────────────────
@@ -407,14 +409,7 @@ function makeTree(x, z, s){
   return g;
 }
 function buildScenery(){
-  const outerR = TR + TW/2 + 5;
-  for(let i=0;i<70;i++){
-    const ang = Math.random()*Math.PI*2;
-    const r   = outerR + 10 + Math.random()*110;
-    const x   = Math.cos(ang) * r;
-    const z   = TC_Z + Math.sin(ang) * r * 1.6;
-    scene.add(makeTree(x, z, 0.7+Math.random()*1.5));
-  }
+  // Trees removed — keep function for future scenery
 }
 
 // ── STARTING GATE ─────────────────────────────────────────────────────────────
@@ -611,16 +606,16 @@ function setupDeer(deerScene, runClip, idleClip, idx){
   cloth.position.y=-.24;
   elf.add(cloth);
   // Floating name tag — canvas sprite, always faces camera
-  const cv=document.createElement('canvas'); cv.width=256; cv.height=64;
+  const cv=document.createElement('canvas'); cv.width=512; cv.height=128;
   const cx2=cv.getContext('2d');
   cx2.fillStyle=SILKS[idx];
-  cx2.beginPath(); cx2.roundRect(4,6,248,52,26); cx2.fill();
+  cx2.beginPath(); cx2.roundRect(6,8,500,112,48); cx2.fill();
   cx2.fillStyle=(idx===3||idx===8)?'#222':'#fff'; // dark text on yellow/white
-  cx2.font='bold 34px sans-serif'; cx2.textAlign='center'; cx2.textBaseline='middle';
-  cx2.fillText(NAMES[idx],128,33);
+  cx2.font='bold 72px sans-serif'; cx2.textAlign='center'; cx2.textBaseline='middle';
+  cx2.fillText(NAMES[idx],256,66);
   const tagTex=new THREE.CanvasTexture(cv);
-  const tag=new THREE.Sprite(new THREE.SpriteMaterial({map:tagTex,depthTest:false,transparent:true,opacity:.92}));
-  tag.scale.set(3.4,.85,1);
+  const tag=new THREE.Sprite(new THREE.SpriteMaterial({map:tagTex,depthTest:false,transparent:true,opacity:.95}));
+  tag.scale.set(5.2,1.3,1);
   scene.add(tag); // world space — tracked per frame
   elf.scale.setScalar(2.2);
   scene.add(elf);
@@ -661,6 +656,9 @@ function configureRace(){
   winnerCamActive=false; winnerCamTimer=0; preRace=false;
   gateOpenAnim=0; gateDoors.forEach(h=>h.rotation.x=0); // close doors
   photoFinish=[]; photoQueue=[];
+  finishLineHidden=false;
+  finishLineGroup.forEach(o=>o.visible=true);
+  finishPoles.forEach(o=>o.visible=true);
   if(gateGroup && !gateGroup.parent) scene.add(gateGroup); // restore gate if removed mid-race
   deerObjs.forEach(d=>{
     if(!d) return;
@@ -668,7 +666,7 @@ function configureRace(){
     d.curLane=d.laneOff;  // live lane that merges inward during the race
     d.stretchLane=null;   // set when a closer swings wide in the stretch
     d.flightProg=-1; d.nextFlight=2.5+Math.random()*4;
-    d.base   = 16 + Math.random()*6;
+    d.base   = 13 + Math.random()*3;   // ~14 m/s avg → ~2 min race
     d.surgeF = 0.45 + Math.random()*1.3;
     d.surgeP = Math.random()*Math.PI*2;
     d.amp    = 0.20 + Math.random()*0.35;
@@ -694,6 +692,10 @@ function beginRace(){
   setTimeout(()=>{
     showCountdown(()=>{ preRace=false; racing=true;
       gateOpenAnim=0.4; // doors fly open
+      // Hide finish line until last deer clears the first curve
+      finishLineGroup.forEach(o=>o.visible=false);
+      finishPoles.forEach(o=>o.visible=false);
+      finishLineHidden=true;
       deerObjs.forEach(d=>{ if(!d) return;
         d.idleAct.stop(); d.action.reset().play(); d.action.paused=false;
       });
@@ -745,6 +747,8 @@ function trackAttachments(){
 
 // ── PHOTO FINISH ──────────────────────────────────────────────────────────────
 let finishPoles=[]; // gantry poles — hidden during photo capture
+let finishLineGroup=[]; // banner + stripe — hidden at race start, restored when last deer exits turn 1
+let finishLineHidden=false;
 let photoFinish=[]; // {name, place, img}
 let photoQueue=[];  // deer waiting for photo capture at end of frame
 function capturePhotoFinish(d){
@@ -807,6 +811,16 @@ function updateRace(dt){
   if(gateGroup && gateGroup.parent){
     const ldChk=leader();
     if(ldChk && (ldChk.progress-P_GATE) > 0.625){ scene.remove(gateGroup); }
+  }
+  // Restore finish line once the LAST deer has cleared the first curve
+  if(finishLineHidden){
+    const last=deerObjs.filter(Boolean).sort((a,b)=>a.progress-b.progress)[0];
+    const firstCurveClear = P_GATE + 0.25; // gate + quarter lap
+    if(last && last.progress > firstCurveClear){
+      finishLineGroup.forEach(o=>o.visible=true);
+      finishPoles.forEach(o=>o.visible=true);
+      finishLineHidden=false;
+    }
   }
   deerObjs.forEach(d=>{
     if(!d) return;
@@ -1019,15 +1033,14 @@ function directCamera(dt){
     camLabel.innerHTML='<span class="rec">●</span> CRANE'; targetFov=48; sm=1.5;
 
   } else if(mode==='blimp'){
-    // Aerial — high enough to show the whole field, centred between leader and pack
     const all=topN(9);
     let minP=1e9, maxP=-1e9;
     all.forEach(d=>{minP=Math.min(minP,d.progress); maxP=Math.max(maxP,d.progress);});
     const fieldSpread=(maxP-minP)*CIRC;
     const lf=leadersFrame();
-    const cx=(lf.x+pc.x)/2, cz=(lf.z+pc.z)/2; // midpoint keeps leader well in frame
-    tp.set(cx, 45 + fieldSpread*0.5, cz);
-    ta.set(lf.x, 0, lf.z); // aim at the leaders
+    const cx=(lf.x+pc.x)/2, cz=(lf.z+pc.z)/2;
+    tp.set(cx, 90 + fieldSpread*0.4, cz);  // higher for doubled track
+    ta.set(lf.x, 0, lf.z);
     camLabel.innerHTML='<span class="rec">●</span> BLIMP'; targetFov=44; sm=1.0;
 
   } else if(mode==='telephoto'){
@@ -1129,7 +1142,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v6.7</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v6.8</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
