@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v6.6</title>
+<title>Reindeer Dash v6.7</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -74,7 +74,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v6.6</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v6.7</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -125,7 +125,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v6.6';
+const VERSION='v6.7';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -340,11 +340,27 @@ function buildOvalTrack(){
   // Finish line gantry at progress=0
   const fp=trackPos(0,0);
   const fi=trackPos(0,-hw-1), fo=trackPos(0,hw+1);
-  [fi,fo].forEach(sp=>{
+  // Outside gantry pole (plain)
+  {
     const pole=new THREE.Mesh(new THREE.CylinderGeometry(.3,.3,9,10),postMat);
-    pole.position.set(sp.x,4.5,sp.z); scene.add(pole);
+    pole.position.set(fo.x,4.5,fo.z); scene.add(pole);
     finishPoles.push(pole);
-  });
+  }
+  // INFIELD: iconic white finish post with gold ball — like Churchill Downs
+  {
+    const whiteM=new THREE.MeshStandardMaterial({color:0xffffff,roughness:.35});
+    const goldM =new THREE.MeshStandardMaterial({color:0xd4af37,roughness:.25,metalness:.6});
+    const post=new THREE.Group();
+    const col=new THREE.Mesh(new THREE.CylinderGeometry(.42,.55,8,12),whiteM);
+    col.position.y=4; post.add(col);
+    const cap=new THREE.Mesh(new THREE.CylinderGeometry(.62,.62,.35,12),whiteM);
+    cap.position.y=8.15; post.add(cap);
+    const ball=new THREE.Mesh(new THREE.SphereGeometry(.42,14,14),goldM);
+    ball.position.y=8.85; post.add(ball);
+    post.position.set(fi.x,0,fi.z);
+    scene.add(post);
+    finishPoles.push(post);
+  }
   // FINISH banner — bold red with white text, canvas texture
   const bcv=document.createElement('canvas'); bcv.width=512; bcv.height=96;
   const bcx=bcv.getContext('2d');
@@ -650,6 +666,7 @@ function configureRace(){
     if(!d) return;
     d.progress=P_GATE; d.place=0; d.finished=false;
     d.curLane=d.laneOff;  // live lane that merges inward during the race
+    d.stretchLane=null;   // set when a closer swings wide in the stretch
     d.flightProg=-1; d.nextFlight=2.5+Math.random()*4;
     d.base   = 16 + Math.random()*6;
     d.surgeF = 0.45 + Math.random()*1.3;
@@ -700,6 +717,31 @@ function showCountdown(done){
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function leader(){ let b=null; deerObjs.forEach(d=>{ if(d&&(!b||d.progress>b.progress)) b=d; }); return b; }
 function idxOf(d){ return deerObjs.indexOf(d); }
+
+// Track nose, elves, name tags to current deer/bone positions.
+// Called from updateRace AND during the pre-race gate lineup.
+function trackAttachments(){
+  const rud=deerObjs[8];
+  if(rud&&rud.noseGroup&&rud.headNode){
+    const wp=new THREE.Vector3(), wq=new THREE.Quaternion();
+    rud.headNode.getWorldPosition(wp); rud.headNode.getWorldQuaternion(wq);
+    const off=new THREE.Vector3(noseOff.x,noseOff.y,noseOff.z);
+    off.applyQuaternion(wq);
+    rud.noseGroup.position.copy(wp).add(off);
+  }
+  const _v=new THREE.Vector3();
+  deerObjs.forEach(d=>{
+    if(!d||!d.elf) return;
+    if(d.backBone){ d.backBone.getWorldPosition(_v); d.elf.position.copy(_v); d.elf.position.y+=0.9; }
+    else { d.elf.position.set(d.group.position.x, d.group.position.y+2.8, d.group.position.z); }
+    if(d.tag){
+      // Staggered heights — 3 rows so tags don't overlap when deer are side by side
+      const row=idxOf(d)%3;
+      d.tag.position.set(d.group.position.x, d.group.position.y+4.9+row*0.95, d.group.position.z);
+    }
+    d.elf.rotation.y=d.group.rotation.y;
+  });
+}
 
 // ── PHOTO FINISH ──────────────────────────────────────────────────────────────
 let finishPoles=[]; // gantry poles — hidden during photo capture
@@ -772,11 +814,16 @@ function updateRace(dt){
       // Decelerate to a walk then stop — keep moving on the track
       d.speed = Math.max(0, d.speed - dt * 8);
       if(d.speed > 0.1){
-        // Final-stretch drama: closers surge in the last 15%
+        // Final-stretch drama: closers surge in the last 15% — and the deepest
+    // closers swing WIDE and charge on the outside (Golden Tempo style)
     const fracDone=(d.progress-P_GATE)/1.25;
     if(fracDone>0.85){
       const rank=topN(9).indexOf(d);
-      d.speed += rank*0.18*dt*8; // deeper closers gain more
+      d.speed += rank*0.18*dt*8;          // deeper closers gain more speed
+      if(rank>=4){
+        // Swing out 2-3 lanes for the outside run
+        d.stretchLane = -(TW/2)+1.2 + 2.8 + (rank-4)*0.8;
+      }
     }
     d.progress += d.speed*dt/CIRC;
         const fp=trackPos(d.progress, d.curLane);
@@ -789,11 +836,16 @@ function updateRace(dt){
     }
     // Speed
     d.speed=Math.max(2, d.base*(1+d.amp*Math.sin(d.surgeF*raceTime+d.surgeP))*(0.92+Math.random()*.16));
-    // Final-stretch drama: closers surge in the last 15%
+    // Final-stretch drama: closers surge in the last 15% — and the deepest
+    // closers swing WIDE and charge on the outside (Golden Tempo style)
     const fracDone=(d.progress-P_GATE)/1.25;
     if(fracDone>0.85){
       const rank=topN(9).indexOf(d);
-      d.speed += rank*0.18*dt*8; // deeper closers gain more
+      d.speed += rank*0.18*dt*8;          // deeper closers gain more speed
+      if(rank>=4){
+        // Swing out 2-3 lanes for the outside run
+        d.stretchLane = -(TW/2)+1.2 + 2.8 + (rank-4)*0.8;
+      }
     }
     d.progress += d.speed*dt/CIRC;
 
@@ -810,12 +862,15 @@ function updateRace(dt){
     }
 
     // Position on oval
-    // Merge toward the inside rail after the start (staggered by lane: inside merges first)
+    // Merge toward the inside rail after the start; in the stretch, surging
+    // closers override with a wide outside lane
     const distRun=(d.progress-P_GATE)*CIRC;
     if(distRun > 15){
-      // target: tight to inside rail with small per-deer spacing to avoid overlap
-      const target=-(TW/2)+1.2+(idxOf(d)%3)*0.9;
-      d.curLane += (target-d.curLane)*Math.min(1, dt*0.35);
+      const target = (d.stretchLane!==undefined && d.stretchLane!==null)
+        ? d.stretchLane
+        : -(TW/2)+1.2+(idxOf(d)%3)*0.9;
+      const rate = (d.stretchLane!==undefined && d.stretchLane!==null) ? 0.9 : 0.35;
+      d.curLane += (target-d.curLane)*Math.min(1, dt*rate);
     }
     const sp=trackPos(d.progress, d.curLane);
     d.group.position.x=sp.x;
@@ -832,25 +887,7 @@ function updateRace(dt){
     }
   });
 
-  // Rudolph nose — head bone + analytically computed offset along snout direction
-  const rud=deerObjs[8];
-  if(rud&&rud.noseGroup&&rud.headNode){
-    const wp=new THREE.Vector3(), wq=new THREE.Quaternion();
-    rud.headNode.getWorldPosition(wp); rud.headNode.getWorldQuaternion(wq);
-    const off=new THREE.Vector3(noseOff.x,noseOff.y,noseOff.z);
-    off.applyQuaternion(wq);
-    rud.noseGroup.position.copy(wp).add(off);
-  }
-
-  // Elf jockeys
-  const _v=new THREE.Vector3();
-  deerObjs.forEach(d=>{
-    if(!d||!d.elf) return;
-    if(d.backBone){ d.backBone.getWorldPosition(_v); d.elf.position.copy(_v); d.elf.position.y+=0.9; }
-    else { d.elf.position.set(d.group.position.x, d.group.position.y+2.8, d.group.position.z); }
-    if(d.tag){ d.tag.position.set(d.group.position.x, d.group.position.y+5.4, d.group.position.z); }
-    d.elf.rotation.y=d.group.rotation.y;
-  });
+  trackAttachments();
 
   // Photo finish — captured now that deer, elf, tag, nose are all in final positions
   while(photoQueue.length){ capturePhotoFinish(photoQueue.shift()); }
@@ -947,11 +984,9 @@ function directCamera(dt){
     } else if(prog<0.85){
       // Home stretch approach — head-on low
       if(autoPick!=='headon_low'){ autoPick='headon_low'; autoCutTimer=999; }
-    } else if(prog<0.88){
-      // Off the final turn — drone glides with the leaders
-      if(autoPick!=='drone'){ autoPick='drone'; autoCutTimer=999; }
     } else {
-      // Final approach + crossing — LOCKED static finish-line shot
+      // Final turn to the wire — ONE continuous panning homestretch shot.
+      // No camera switching from here until everyone is home.
       if(autoPick!=='wire'){ autoPick='wire'; autoCutTimer=999; }
     }
     mode=autoPick;
@@ -1033,13 +1068,18 @@ function directCamera(dt){
     }
 
   } else if(mode==='wire'){
-    // STATIC side-on finish shot — line frozen at the RIGHT edge of frame,
-    // deer enter from the LEFT and run across it. Camera locked.
-    const cp=trackPos(-11/CIRC, TW/2+15); // 11m past the line, outside rail
-    const aim=trackPos(-9/CIRC, 0);       // aim 9m past the line → line at RIGHT edge
-    tp.set(cp.x, 3.2, cp.z);
-    ta.set(aim.x, 1.5, aim.z);
-    camLabel.innerHTML='<span class="rec">●</span> FINISH LINE'; targetFov=46; sm=9.0;
+    // HOMESTRETCH CAM — single continuous shot like the NBC broadcast:
+    // high camera near the finish, FIXED position, PANS with the leaders
+    // down the stretch and across the line. Never cuts away.
+    const hc=trackPos(-8/CIRC, TW/2+30);  // just past the line, high outside
+    tp.set(hc.x, 26, hc.z);               // constant position — pan only
+    const lf=leadersFrame();
+    ta.set(lf.x, 1.5, lf.z);              // aim tracks the leaders
+    // Zoomed when they're far up the stretch, easing wider as they near
+    const dx=lf.x-tp.x, dz=lf.z-tp.z;
+    const dist=Math.hypot(dx,dz);
+    targetFov=Math.max(16, Math.min(42, dist*0.16 + lf.spread*0.9));
+    camLabel.innerHTML='<span class="rec">●</span> HOMESTRETCH'; sm=5.0;
 
   } else if(mode==='infield'){
     const lf=leadersFrame();
@@ -1089,7 +1129,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v6.6</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v6.7</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
@@ -1186,6 +1226,11 @@ function animate(){
   for(let i=0;i<sp.count;i++){ let y=sp.getY(i)-11*dt; if(y<0)y=65; sp.setY(i,y); }
   sp.needsUpdate=true;
   if(racing) updateRace(dt);
+  else if(preRace){
+    // Gate lineup — idle animation plays, elves stay seated, tags track
+    deerObjs.forEach(d=>{ if(d){ d.mixer.timeScale=1; d.mixer.update(dt); } });
+    trackAttachments();
+  }
   updateGateDoors(dt);
   if(calActive) updateCalCamera(); else directCamera(dt);
   renderer.render(scene, camera);
