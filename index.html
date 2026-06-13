@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v6.8</title>
+<title>Reindeer Dash v6.9</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -74,7 +74,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v6.8</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v6.9</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -125,7 +125,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v6.8';
+const VERSION='v6.9';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -233,7 +233,7 @@ function init(){
   scene.background = new THREE.Color(0x8aadd4);
   scene.fog = new THREE.Fog(0x8aadd4, 120, 560);
 
-  camera = new THREE.PerspectiveCamera(54, innerWidth/innerHeight, 0.1, 1200);
+  camera = new THREE.PerspectiveCamera(54, innerWidth/innerHeight, 0.1, 2000);
   camera.position.copy(camPos);
 
   renderer = new THREE.WebGLRenderer({antialias: true});
@@ -252,7 +252,7 @@ function init(){
   sun.shadow.mapSize.set(1024, 1024);
   sun.shadow.camera.left = -110; sun.shadow.camera.right  = 110;
   sun.shadow.camera.top  =  110; sun.shadow.camera.bottom = -110;
-  sun.shadow.camera.near = 1;    sun.shadow.camera.far    = 600;
+  sun.shadow.camera.near = 1;    sun.shadow.camera.far    = 1200;
   scene.add(sun);
 
   buildGround();
@@ -301,7 +301,7 @@ function init(){
 // ── GROUND ────────────────────────────────────────────────────────────────────
 function buildGround(){
   const g = new THREE.Mesh(
-    new THREE.PlaneGeometry(1600, 1600),
+    new THREE.PlaneGeometry(1200, 1200),
     new THREE.MeshStandardMaterial({color: 0xddeeff, roughness: 0.95})
   );
   g.rotation.x = -Math.PI/2;
@@ -460,9 +460,9 @@ function buildSnow(){
   snowGeo = new THREE.BufferGeometry();
   const cnt=700, arr=new Float32Array(cnt*3);
   for(let i=0;i<cnt;i++){
-    arr[i*3]   = (Math.random()-.5)*400;
+    arr[i*3]   = (Math.random()-.5)*300;
     arr[i*3+1] = Math.random()*65;
-    arr[i*3+2] = TC_Z + (Math.random()-.5)*440;
+    arr[i*3+2] = TC_Z + (Math.random()-.5)*340;
   }
   snowGeo.setAttribute('position', new THREE.BufferAttribute(arr,3));
   scene.add(new THREE.Points(snowGeo,
@@ -1039,7 +1039,7 @@ function directCamera(dt){
     const fieldSpread=(maxP-minP)*CIRC;
     const lf=leadersFrame();
     const cx=(lf.x+pc.x)/2, cz=(lf.z+pc.z)/2;
-    tp.set(cx, 90 + fieldSpread*0.4, cz);  // higher for doubled track
+    tp.set(cx, 130 + fieldSpread*0.3, cz); // altitude for mid-size track
     ta.set(lf.x, 0, lf.z);
     camLabel.innerHTML='<span class="rec">●</span> BLIMP'; targetFov=44; sm=1.0;
 
@@ -1142,7 +1142,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v6.8</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v6.9</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
