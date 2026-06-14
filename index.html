@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v7.1</title>
+<title>Reindeer Dash v7.2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -74,7 +74,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.1</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.2</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -125,7 +125,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v7.1';
+const VERSION='v7.2';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -257,22 +257,20 @@ function init(){
 
   buildGround();
   buildScenery();
-  // INFIELD — green oval interior, clearly visible from blimp
-  // Built from two semicircles + central rectangle
+  // INFIELD — green oval interior. Use full circles at each end + wide rect to fill gaps.
   {
     const infM=new THREE.MeshStandardMaterial({color:0x2d7a1a,roughness:.9});
     const ri=TR-TW/2-1.5; // inner infield radius
-    // Central rectangle spanning the two straights
+    // Central rectangle spanning the two straights (full width between turn centres)
     const rect=new THREE.Mesh(new THREE.BoxGeometry(ri*2,0.05,STR),infM);
     rect.position.set(0,0.02,STR/2);
     scene.add(rect);
-    // Bottom semicircle (centred at z=0)
-    const botGeo=new THREE.CylinderGeometry(ri,ri,0.05,48,1,false,0,Math.PI);
+    // Full circles at each turn centre (not semicircles) to guarantee no gaps
+    const botGeo=new THREE.CylinderGeometry(ri,ri,0.05,64);
     const bot=new THREE.Mesh(botGeo,infM);
     bot.position.set(0,0.02,0);
     scene.add(bot);
-    // Top semicircle (centred at z=STR=160, rotated PI)
-    const topGeo=new THREE.CylinderGeometry(ri,ri,0.05,48,1,false,Math.PI,Math.PI);
+    const topGeo=new THREE.CylinderGeometry(ri,ri,0.05,64);
     const top=new THREE.Mesh(topGeo,infM);
     top.position.set(0,0.02,STR);
     scene.add(top);
@@ -354,18 +352,43 @@ function buildOvalTrack(){
     });
   }
 
-  // FENCE: dense tall posts + two thick rails
+  // FENCE: candy cane posts (red/white stripes + hook) + two white rails
+  const whiteMat = new THREE.MeshStandardMaterial({color:0xffffff,roughness:.3,emissive:0xffffff,emissiveIntensity:.15});
+  const redMat   = new THREE.MeshStandardMaterial({color:0xcc1122,roughness:.4,emissive:0x880000,emissiveIntensity:.3});
+  const caneRailMat = new THREE.MeshStandardMaterial({color:0xeeeeee,roughness:.25,emissive:0xffffff,emissiveIntensity:.2});
+
+  function makeCandyCane(height, radius){
+    const g = new THREE.Group();
+    const nStripes = 6;
+    const stripeH = height / (nStripes * 2);
+    for(let s=0; s<nStripes*2; s++){
+      const mat = s%2===0 ? redMat : whiteMat;
+      const seg = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, stripeH, 8), mat);
+      seg.position.y = s * stripeH + stripeH/2;
+      g.add(seg);
+    }
+    // Hook: torus arc at the top, tilted to face outward like a candy cane hook
+    const hookGeo = new THREE.TorusGeometry(radius*2.5, radius*0.7, 8, 12, Math.PI);
+    const hook = new THREE.Mesh(hookGeo, redMat);
+    hook.position.y = height + radius*2.5;
+    hook.rotation.z = Math.PI/2;  // arc curves sideways
+    g.add(hook);
+    return g;
+  }
+
   for(let i=0;i<nPosts;i++){
     const u0=i/nPosts, u1=(i+1)/nPosts;
     [-hw, hw].forEach(off=>{
       const a=trackPos(u0,off), b=trackPos(u1,off);
-      const post=new THREE.Mesh(new THREE.CylinderGeometry(.25,.25,2.8,8),postMat);
-      post.position.set(a.x,1.4,a.z); scene.add(post);
+      const cane = makeCandyCane(2.8, 0.22);
+      cane.position.set(a.x, 0, a.z);
+      cane.rotation.y = a.ry;  // orient hook to face outward from track
+      scene.add(cane);
       const mx=(a.x+b.x)/2, mz=(a.z+b.z)/2;
       const dx=b.x-a.x, dz=b.z-a.z;
       const len=Math.sqrt(dx*dx+dz*dz)+.05;
       [0.9, 2.1].forEach(ry=>{
-        const rail=new THREE.Mesh(new THREE.BoxGeometry(len,.22,.38),railMat);
+        const rail=new THREE.Mesh(new THREE.BoxGeometry(len,.22,.38),caneRailMat);
         rail.position.set(mx,ry,mz);
         rail.rotation.y=-Math.atan2(dz,dx);
         scene.add(rail);
@@ -977,20 +1000,20 @@ function directCamera(dt){
 
   // Pre-race: all deer head-on in the gate
   if(preRace){
-    // Centre on the actual deer pack (mid lane), facing them head-on
-    const gpL = trackPos(P_GATE, -((N-1)/2)*LANE_W);
-    const gpR = trackPos(P_GATE, ((N-1)/2)*LANE_W);
-    const cx = (gpL.x+gpR.x)/2, cz = (gpL.z+gpR.z)/2;
-    // Deer facing direction from gate ry — camera goes IN FRONT of them
-    const gp0 = trackPos(P_GATE, 0);
-    const fx = Math.sin(gp0.ry), fz = Math.cos(gp0.ry); // facing unit vector
-    // SNAP instantly — this is the opening shot, no lerp from old position
-    camPos.set(cx + fx*24, 5, cz + fz*24);
-    camAim.set(cx, 2, cz);
+    // Camera at finish line looking DOWN the homestretch toward the starting gate.
+    // Gives "director standing at the wire watching the horses load" feel.
+    const fp = trackPos(0, 0);   // finish line centre
+    const gp = trackPos(P_GATE, 0); // gate centre
+    const dx = gp.x - fp.x, dz = gp.z - fp.z;
+    const dist = Math.sqrt(dx*dx+dz*dz);
+    const nx = dx/dist, nz = dz/dist;
+    // Stand just behind the finish line, slightly elevated, look up the stretch
+    camPos.set(fp.x - nx*20, 9, fp.z - nz*20);
+    camAim.set(gp.x, 2, gp.z);
     camera.position.copy(camPos); camera.lookAt(camAim);
     camLabel.innerHTML='<span class="rec">●</span> STARTING GATE';
-    currentFov=targetFov=55;
-    camera.fov=55; camera.updateProjectionMatrix();
+    currentFov=targetFov=52;
+    camera.fov=52; camera.updateProjectionMatrix();
     return;
   }
 
@@ -1073,17 +1096,21 @@ function directCamera(dt){
     camLabel.innerHTML='<span class="rec">●</span> CRANE'; targetFov=48; sm=1.5;
 
   } else if(mode==='blimp'){
-    // Tilted overhead — camera above+north, looking south+down at 68° elevation.
-    // Oval long axis (280m, z-axis) fills portrait screen height; no gimbal lock.
-    // Blimp establishing shot: elevated SE corner showing both turns and straights.
-    // Deer, rails, and oval shape all visible with name tags.
-    camPos.set(TR + 110, 145, STR + TR + 55);
-    camAim.set(-TR/4, 2, STR*0.1);  // aim low in the oval — shows more track, less sky
+    // True blimp overhead: camera directly above oval centre, slight tilt to avoid
+    // gimbal lock. Offset camera a little to the side and tilt so oval fills frame.
+    // Track oval: width 120+2*TW, height STR+2*TR+2*TW. Centre at (TC_X, 0, TC_Z).
+    // Height chosen so entire oval fits portrait screen at FOV 70.
+    // Slight X offset (40m) so lookAt direction is never straight down (no gimbal).
+    const bx = TC_X + 40;
+    const by = STR * 1.05;  // high enough to see full oval
+    const bz = TC_Z;
+    camPos.set(bx, by, bz);
+    camAim.set(TC_X, 0, TC_Z);  // aim at oval centre
     camera.position.copy(camPos);
     camera.up.set(0,1,0);
     camera.lookAt(camAim);
-    currentFov=targetFov=62;
-    camera.fov=62; camera.updateProjectionMatrix();
+    currentFov=targetFov=70;
+    camera.fov=70; camera.updateProjectionMatrix();
     camLabel.innerHTML='<span class="rec">●</span> BLIMP';
     return;
 
@@ -1159,9 +1186,7 @@ function directCamera(dt){
   camera.position.copy(camPos);
   // Blimp looks nearly straight down — set up=(0,0,-1) so oval long axis = portrait vertical
   if(mode==='blimp'){
-    camera.up.set(0,0,-1);
-    camera.lookAt(camAim);
-    camera.up.set(0,1,0); // restore for all other cameras
+    // blimp already handled above with early return — nothing here
   } else {
     camera.up.set(0,1,0);
     camera.lookAt(camAim);
@@ -1194,7 +1219,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.1</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.2</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
