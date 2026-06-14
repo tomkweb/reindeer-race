@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v7.0</title>
+<title>Reindeer Dash v7.1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -74,7 +74,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.0</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.1</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -125,7 +125,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v7.0';
+const VERSION='v7.1';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -257,6 +257,26 @@ function init(){
 
   buildGround();
   buildScenery();
+  // INFIELD — green oval interior, clearly visible from blimp
+  // Built from two semicircles + central rectangle
+  {
+    const infM=new THREE.MeshStandardMaterial({color:0x2d7a1a,roughness:.9});
+    const ri=TR-TW/2-1.5; // inner infield radius
+    // Central rectangle spanning the two straights
+    const rect=new THREE.Mesh(new THREE.BoxGeometry(ri*2,0.05,STR),infM);
+    rect.position.set(0,0.02,STR/2);
+    scene.add(rect);
+    // Bottom semicircle (centred at z=0)
+    const botGeo=new THREE.CylinderGeometry(ri,ri,0.05,48,1,false,0,Math.PI);
+    const bot=new THREE.Mesh(botGeo,infM);
+    bot.position.set(0,0.02,0);
+    scene.add(bot);
+    // Top semicircle (centred at z=STR=160, rotated PI)
+    const topGeo=new THREE.CylinderGeometry(ri,ri,0.05,48,1,false,Math.PI,Math.PI);
+    const top=new THREE.Mesh(topGeo,infM);
+    top.position.set(0,0.02,STR);
+    scene.add(top);
+  }
   buildStartingGate();
   buildSnow();
   loadAllDeer();        // ← start loading models immediately
@@ -302,7 +322,7 @@ function init(){
 function buildGround(){
   const g = new THREE.Mesh(
     new THREE.PlaneGeometry(800, 800),
-    new THREE.MeshStandardMaterial({color: 0x4a7c3f, roughness: 0.95}) // dark green like real track infield
+    new THREE.MeshStandardMaterial({color: 0x6b4423, roughness: 0.95}) // rich dirt brown
   );
   g.rotation.x = -Math.PI/2;
   g.receiveShadow = true;
@@ -311,9 +331,9 @@ function buildGround(){
 
 // ── OVAL TRACK VISUAL ─────────────────────────────────────────────────────────
 function buildOvalTrack(){
-  const railMat  = new THREE.MeshStandardMaterial({color:0xffffff,roughness:.2,emissive:0xdddddd,emissiveIntensity:.5});
-  const postMat  = new THREE.MeshStandardMaterial({color:0xcc3344,roughness:.4,emissive:0xaa1122,emissiveIntensity:.4});
-  const curbMat  = new THREE.MeshStandardMaterial({color:0xffffff,roughness:.2,emissive:0xffffff,emissiveIntensity:.6});
+  const railMat  = new THREE.MeshStandardMaterial({color:0x222222,roughness:.3});
+  const postMat  = new THREE.MeshStandardMaterial({color:0xcc3344,roughness:.4,emissive:0x881122,emissiveIntensity:.5});
+  const curbMat  = new THREE.MeshStandardMaterial({color:0xffffff,roughness:.2,emissive:0xffffff,emissiveIntensity:.8});
   const bannerMat= new THREE.MeshStandardMaterial({color:0x155724});
   const hw = TW/2 + 1.5;
   const nCurb = 400; // high segment count — smooth curb strip visible from blimp
@@ -327,7 +347,7 @@ function buildOvalTrack(){
       const mx=(a.x+b.x)/2, mz=(a.z+b.z)/2;
       const dx=b.x-a.x, dz=b.z-a.z;
       const len=Math.sqrt(dx*dx+dz*dz)+.04;
-      const curb=new THREE.Mesh(new THREE.BoxGeometry(len,.12,1.8),curbMat);
+      const curb=new THREE.Mesh(new THREE.BoxGeometry(len,.15,3.0),curbMat);
       curb.position.set(mx,.06,mz);
       curb.rotation.y=-Math.atan2(dz,dx);
       scene.add(curb);
@@ -472,18 +492,7 @@ function updateGateDoors(dt){
 }
 
 // ── SNOW ──────────────────────────────────────────────────────────────────────
-function buildSnow(){
-  snowGeo = new THREE.BufferGeometry();
-  const cnt=700, arr=new Float32Array(cnt*3);
-  for(let i=0;i<cnt;i++){
-    arr[i*3]   = (Math.random()-.5)*220;
-    arr[i*3+1] = Math.random()*65;
-    arr[i*3+2] = TC_Z + (Math.random()-.5)*260;
-  }
-  snowGeo.setAttribute('position', new THREE.BufferAttribute(arr,3));
-  scene.add(new THREE.Points(snowGeo,
-    new THREE.PointsMaterial({color:0xffffff,size:.5,transparent:true,opacity:.8,depthWrite:false})));
-}
+function buildSnow(){ /* removed — dirt track, no snow */ }
 
 // ── ELF JOCKEY ────────────────────────────────────────────────────────────────
 function makeElf(coatColor){
@@ -991,11 +1000,11 @@ function directCamera(dt){
     const prog=ld ? Math.min(1,(ld.progress-P_GATE)/1.25) : 0;
 
     if(raceTime<1.5){
-      // Just opened — wide establishing shot
-      autoPick='grandstand';
-    } else if(prog<0.10){
-      // First turn — grandstand tracking
-      autoPick='grandstand';
+      // Gates just opened — locked crane behind the gate
+      autoPick='gate_crane';
+    } else if(prog<0.16){
+      // Through the first curve — crane follows from high behind
+      autoPick='gate_crane';
     } else if(prog<0.28){
       // High angle — crane/blimp
       autoCutTimer-=dt;
@@ -1045,6 +1054,17 @@ function directCamera(dt){
     ta.set(lf.x, 2, lf.z);
     camLabel.innerHTML='<span class="rec">●</span> GRANDSTAND'; sm=2.5;
 
+  } else if(mode==='gate_crane'){
+    // CRANE from start gate to first curve — high, behind gate, watches the burst out
+    const gp=trackPos(P_GATE, 0);
+    const fx=Math.sin(gp.ry), fz=Math.cos(gp.ry); // gate facing direction
+    const lf=leadersFrame();
+    // Camera high and BEHIND the gate (opposite to race direction)
+    tp.set(gp.x - fx*30, 38, gp.z - fz*30);
+    // Aim at the leaders as they pull away
+    ta.set(lf.x, 2, lf.z);
+    camLabel.innerHTML='<span class="rec">●</span> CRANE'; targetFov=52; sm=2.5;
+
   } else if(mode==='crane'){
     // High crane — frames leaders, zooms with spread
     const lf=leadersFrame();
@@ -1053,10 +1073,19 @@ function directCamera(dt){
     camLabel.innerHTML='<span class="rec">●</span> CRANE'; targetFov=48; sm=1.5;
 
   } else if(mode==='blimp'){
-    // STATIC overhead — fixed on the track centre, shows the entire oval
-    tp.set(TC_X, 230, TC_Z);  // full 160/60 oval — phone portrait fits well
-    ta.set(TC_X, 0, TC_Z);
-    camLabel.innerHTML='<span class="rec">●</span> BLIMP'; targetFov=82; sm=3.0;
+    // Tilted overhead — camera above+north, looking south+down at 68° elevation.
+    // Oval long axis (280m, z-axis) fills portrait screen height; no gimbal lock.
+    // Blimp establishing shot: elevated SE corner showing both turns and straights.
+    // Deer, rails, and oval shape all visible with name tags.
+    camPos.set(TR + 110, 145, STR + TR + 55);
+    camAim.set(-TR/4, 2, STR*0.1);  // aim low in the oval — shows more track, less sky
+    camera.position.copy(camPos);
+    camera.up.set(0,1,0);
+    camera.lookAt(camAim);
+    currentFov=targetFov=62;
+    camera.fov=62; camera.updateProjectionMatrix();
+    camLabel.innerHTML='<span class="rec">●</span> BLIMP';
+    return;
 
   } else if(mode==='telephoto'){
     // Long lens on the leaders — compression effect
@@ -1125,10 +1154,18 @@ function directCamera(dt){
 
   const a=1-Math.exp(-sm*dt);
   camPos.lerp(tp,a); camAim.lerp(ta,a);
-  // NaN recovery — never let a poisoned lerp stick
   if(!isFinite(camPos.x)||!isFinite(camPos.y)||!isFinite(camPos.z)){ camPos.copy(tp); }
   if(!isFinite(camAim.x)||!isFinite(camAim.y)||!isFinite(camAim.z)){ camAim.copy(ta); }
-  camera.position.copy(camPos); camera.lookAt(camAim);
+  camera.position.copy(camPos);
+  // Blimp looks nearly straight down — set up=(0,0,-1) so oval long axis = portrait vertical
+  if(mode==='blimp'){
+    camera.up.set(0,0,-1);
+    camera.lookAt(camAim);
+    camera.up.set(0,1,0); // restore for all other cameras
+  } else {
+    camera.up.set(0,1,0);
+    camera.lookAt(camAim);
+  }
 }
 
 // ── RESULTS ───────────────────────────────────────────────────────────────────
@@ -1157,7 +1194,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.0</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.1</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
@@ -1250,9 +1287,7 @@ function updateCalCamera(){
 function animate(){
   requestAnimationFrame(animate);
   const dt=Math.min(0.05, clock.getDelta());
-  const sp=snowGeo.attributes.position;
-  for(let i=0;i<sp.count;i++){ let y=sp.getY(i)-11*dt; if(y<0)y=65; sp.setY(i,y); }
-  sp.needsUpdate=true;
+  // snow removed
   if(racing) updateRace(dt);
   else if(preRace){
     // Gate lineup — idle animation plays, elves stay seated, tags track
