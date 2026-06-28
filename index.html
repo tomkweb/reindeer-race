@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v7.2</title>
+<title>Reindeer Dash v7.3</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -74,7 +74,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.2</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.3</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -125,7 +125,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v7.2';
+const VERSION='v7.3';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -1097,17 +1097,15 @@ function directCamera(dt){
 
   } else if(mode==='blimp'){
     // True blimp overhead: camera directly above oval centre, slight tilt to avoid
-    // gimbal lock. Offset camera a little to the side and tilt so oval fills frame.
-    // Track oval: width 120+2*TW, height STR+2*TR+2*TW. Centre at (TC_X, 0, TC_Z).
-    // Height chosen so entire oval fits portrait screen at FOV 70.
-    // Slight X offset (40m) so lookAt direction is never straight down (no gimbal).
-    const bx = TC_X + 40;
+    // gimbal lock. Rotated 90° from original — offset along Z instead of X, with
+    // up-vector rolled so the oval's long axis runs vertically on portrait screen.
+    const bx = TC_X;
     const by = STR * 1.05;  // high enough to see full oval
-    const bz = TC_Z;
+    const bz = TC_Z + 40;   // offset along Z now (was X) — rotates view 90°
     camPos.set(bx, by, bz);
     camAim.set(TC_X, 0, TC_Z);  // aim at oval centre
     camera.position.copy(camPos);
-    camera.up.set(0,1,0);
+    camera.up.set(1,0,0);  // rolled 90° so oval long axis reads vertical
     camera.lookAt(camAim);
     currentFov=targetFov=70;
     camera.fov=70; camera.updateProjectionMatrix();
@@ -1219,7 +1217,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.2</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.3</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
