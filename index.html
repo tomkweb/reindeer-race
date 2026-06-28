@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v7.3</title>
+<title>Reindeer Dash v7.4</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -74,7 +74,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.3</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.4</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -125,7 +125,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v7.3';
+const VERSION='v7.4';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -1000,20 +1000,21 @@ function directCamera(dt){
 
   // Pre-race: all deer head-on in the gate
   if(preRace){
-    // Camera at finish line looking DOWN the homestretch toward the starting gate.
-    // Gives "director standing at the wire watching the horses load" feel.
-    const fp = trackPos(0, 0);   // finish line centre
-    const gp = trackPos(P_GATE, 0); // gate centre
+    // Camera positioned close in front of the gate, looking straight at the
+    // horses head-on. Tight framing on the pack, not the empty finish straight.
+    const gp = trackPos(P_GATE, 0);     // gate centre
+    const fp = trackPos(0, 0);          // finish line centre (for direction only)
     const dx = gp.x - fp.x, dz = gp.z - fp.z;
     const dist = Math.sqrt(dx*dx+dz*dz);
-    const nx = dx/dist, nz = dz/dist;
-    // Stand just behind the finish line, slightly elevated, look up the stretch
-    camPos.set(fp.x - nx*20, 9, fp.z - nz*20);
-    camAim.set(gp.x, 2, gp.z);
+    const nx = dx/dist, nz = dz/dist;   // unit vector from finish toward gate
+    // Stand close in front of the gate (between gate and finish, but near the gate)
+    // so the horses fill the frame, not the open stretch behind them.
+    camPos.set(gp.x - nx*14, 3.2, gp.z - nz*14);
+    camAim.set(gp.x, 2.2, gp.z);
     camera.position.copy(camPos); camera.lookAt(camAim);
     camLabel.innerHTML='<span class="rec">●</span> STARTING GATE';
-    currentFov=targetFov=52;
-    camera.fov=52; camera.updateProjectionMatrix();
+    currentFov=targetFov=32;
+    camera.fov=32; camera.updateProjectionMatrix();
     return;
   }
 
@@ -1217,7 +1218,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.3</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.4</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
