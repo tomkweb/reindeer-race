@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v7.7</title>
+<title>Reindeer Dash v7.8</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -79,7 +79,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.7</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.8</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -130,7 +130,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v7.7';
+const VERSION='v7.8';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -740,11 +740,11 @@ function configureRace(){
     d.curLane=d.laneOff;  // live lane that merges inward during the race
     d.stretchLane=null;   // set when a closer swings wide in the stretch
     d.flightProg=-1; d.nextFlight=2.5+Math.random()*4;
-    d.base   = 13 + Math.random()*3;   // ~14 m/s avg → ~2 min race
+    d.base   = 13.6 + Math.random()*0.8; // tight spread — nobody runs away with it
     d.isCloser = false;                // drama closer — assigned below
-    d.surgeF = 0.45 + Math.random()*1.3;
+    d.surgeF = 0.55 + Math.random()*1.4;
     d.surgeP = Math.random()*Math.PI*2;
-    d.amp    = 0.20 + Math.random()*0.35;
+    d.amp    = 0.28 + Math.random()*0.30;  // bigger surges → constant lead changes
     d.speed  = d.base;
     const sp=trackPos(P_GATE, d.laneOff);
     d.group.position.set(sp.x, 0, sp.z);
@@ -759,8 +759,8 @@ function configureRace(){
   dramaCloser = deerObjs[Math.floor(Math.random()*N)] || null;
   if(dramaCloser){
     dramaCloser.isCloser = true;
-    dramaCloser.base *= 0.94;   // runs off the pace early
-    dramaCloser.amp = Math.min(dramaCloser.amp, 0.22); // steady, saving ground
+    dramaCloser.base *= 0.965;  // runs off the pace — rubber-band keeps it in touch
+    dramaCloser.amp = Math.min(dramaCloser.amp, 0.20); // steady, saving ground
   }
 }
 function beginRace(){
@@ -945,19 +945,48 @@ function updateRace(dt){
       d.mixer.update(dt);
       return;
     }
-    // Speed
+    // Speed — base + sinusoidal surges (lead changes come from these)
     d.speed=Math.max(2, d.base*(1+d.amp*Math.sin(d.surgeF*raceTime+d.surgeP))*(0.92+Math.random()*.16));
-    // Final-stretch drama: back-markers pick up a little late speed — and the
-    // designated CLOSER unleashes a monster kick, swinging wide Golden Tempo style
+    // RUBBER-BAND: compress the pack — the front is eased, the back is helped,
+    // so the surges above constantly shuffle the running order. Neck-and-neck racing.
     const fracDone=(d.progress-P_GATE)/1.25;
-    if(fracDone>0.85){
+    {
+      let mp=0, nn=0;
+      deerObjs.forEach(o=>{ if(o && !o.finished){ mp+=o.progress; nn++; } });
+      if(nn>0){
+        mp/=nn;
+        const gapM=(d.progress-mp)*CIRC;           // metres ahead(+)/behind(-) of pack centre
+        // The closer is exempt from the tow before its kick — it stays at the back
+        // Closer: light tow at the back early, FULLY exempt during its kick —
+        // otherwise the band drags it back into the pack after it takes the lead
+        const bandStr = d.isCloser ? (fracDone>0.78 ? 0 : (gapM<0 ? 0.002 : 0.006)) : 0.006;
+        d.speed *= Math.max(0.85, Math.min(1.15, 1 - gapM*bandStr));
+      }
+    }
+    if(fracDone>0.85 && !d.isCloser){
       const rank=topN(9).indexOf(d);
-      d.speed += rank*0.12*dt*8;          // mild pack tightening
+      d.speed += rank*0.10*dt*8;          // mild pack tightening in the drive
     }
     if(d.isCloser && fracDone>0.78){
-      // Ramp from 0 at 78% to full kick at 95% — a charge the field can't match
-      const kick = Math.min(1, (fracDone-0.78)/0.17);
-      d.speed *= 1 + kick*0.42;
+      // THE CHARGE — gap-aware kick guaranteeing the closer runs down the leader
+      // just before the wire. Speed is set from what's needed, so it always looks
+      // like a monster rally rather than a teleport.
+      // Pace off the best of the REST of the field (works whether chasing or leading)
+      let rival=null;
+      deerObjs.forEach(o=>{ if(o && o!==d && !o.finished){
+        if(!rival || o.progress>rival.progress) rival=o;
+      }});
+      if(rival){
+        const gap=(rival.progress-d.progress)*CIRC;          // metres to make up (− = leading)
+        const remain=Math.max(6,(P_FINISH-d.progress)*CIRC); // metres left to run
+        if(gap>0){
+          // Catch the front-runner at ~90% of the remaining run — pass before the wire
+          const need=(rival.speed + gap/(remain*0.90/Math.max(4,d.speed)));
+          d.speed=Math.min(d.speed*1.65, Math.max(d.speed, need*1.06));
+        } else {
+          d.speed=Math.max(d.speed, rival.speed*1.05);       // in front — hold off the rally
+        }
+      }
       // Swing 3 lanes wide for the outside charge
       d.stretchLane = -(TW/2)+1.2 + 3.4;
     }
@@ -1080,10 +1109,14 @@ function directCamera(dt){
       autoPick='wire';                 // first pass down the homestretch — wire cam pans
     } else if(prog<0.45){
       autoPick='grandstand';           // through turn 1 into the backstretch
-    } else if(prog<0.52){
-      autoPick='blimp';                // single aerial establishing shot
     } else if(prog<0.70){
-      autoPick='telephoto';            // backstretch — long-lens compression
+      // Backstretch — cut between crane, telephoto, and one blimp look
+      autoCutTimer-=dt;
+      if(autoCutTimer<=0 || (autoPick!=='crane'&&autoPick!=='telephoto'&&autoPick!=='blimp')){
+        const pool=['crane','telephoto','crane','blimp','crane'];
+        let pick; do{pick=pool[Math.floor(Math.random()*pool.length)];}while(pick===autoPick);
+        autoPick=pick; autoCutTimer=4+Math.random()*2;
+      }
     } else if(prog<0.85){
       autoPick='headon_low';           // far turn — field turns for home
     } else if(prog<0.90){
@@ -1123,11 +1156,13 @@ function directCamera(dt){
   } else if(mode==='grandstand'){
     // Side tracking — distance scales with leader spread (tight when bunched, wide when spread)
     const lf=leadersFrame();
-    const dist = 6 + lf.spread*0.8;
+    const finalRun = raceFrac>0.88;   // the run to the line — punch in close
+    const dist = finalRun ? 4.5 + lf.spread*0.5 : 6 + lf.spread*0.8;
     // Offset perpendicular from the leaders, not from track centre — stays close on the far side too
-    tp.set(lf.x + (TW/2 + dist), 3+lf.spread*0.15, lf.z);
+    tp.set(lf.x + (TW/2 + dist), finalRun ? 2.4+lf.spread*0.1 : 3+lf.spread*0.15, lf.z);
     ta.set(lf.x, 2, lf.z);
-    camLabel.innerHTML='<span class="rec">●</span> GRANDSTAND'; sm=2.5;
+    if(finalRun) targetFov=44;
+    camLabel.innerHTML='<span class="rec">●</span> GRANDSTAND'; sm=finalRun?4.0:2.5;
 
   } else if(mode==='gate_crane'){
     // CRANE from start gate to first curve — high, behind gate, watches the burst out
@@ -1234,8 +1269,9 @@ function directCamera(dt){
     // as they bear down on the camera so nobody leaves the frame.
     const dx=ax-tp.x, dz=az-tp.z;
     const dist=Math.max(8, Math.hypot(dx,dz));
-    const halfW = sprd*0.5 + 5;           // half-extent to fit, plus margin
-    targetFov=Math.max(18, Math.min(75, 2*Math.atan(halfW/dist)*180/Math.PI));
+    // Final pass runs a much tighter margin — punched-in on the duel
+    const halfW = earlyPass ? sprd*0.5 + 5 : sprd*0.42 + 2;
+    targetFov=Math.max(14, Math.min(75, 2*Math.atan(halfW/dist)*180/Math.PI));
     camLabel.innerHTML='<span class="rec">●</span> HOMESTRETCH'; sm=5.0;
 
   } else if(mode==='infield'){
@@ -1292,7 +1328,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.7</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.8</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
