@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v7.5</title>
+<title>Reindeer Dash v7.6</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -79,7 +79,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.5</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.6</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -130,7 +130,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v7.5';
+const VERSION='v7.6';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -216,6 +216,8 @@ let scene, camera, renderer, clock;
 let deerObjs=new Array(N).fill(null), deerLoaded=0, deerScale=1, autoScaleDone=false;
 let racing=false, raceTime=0, finishCounter=0, finishedAll=false, postTimer=0;
 let paused=false;
+let dramaCloser=null;  // the designated come-from-behind runner this race
+let activeCam='auto';  // the camera actually rendering this frame (resolves 'auto' picks)
 let preRace=false, preRaceTimer=0;
 const PRE_RACE_DUR=5.0; // seconds of gate head-on before gates open
 let camMode='auto', autoPick='gate', autoCutTimer=0;
@@ -739,6 +741,7 @@ function configureRace(){
     d.stretchLane=null;   // set when a closer swings wide in the stretch
     d.flightProg=-1; d.nextFlight=2.5+Math.random()*4;
     d.base   = 13 + Math.random()*3;   // ~14 m/s avg → ~2 min race
+    d.isCloser = false;                // drama closer — assigned below
     d.surgeF = 0.45 + Math.random()*1.3;
     d.surgeP = Math.random()*Math.PI*2;
     d.amp    = 0.20 + Math.random()*0.35;
@@ -750,6 +753,15 @@ function configureRace(){
     d.action.reset().play(); d.action.paused=false;
     d.mixer.setTime(Math.random()*2);
   });
+  // COME-FROM-BEHIND DRAMA — one random deer per race is the designated closer:
+  // slightly handicapped early so it sits mid-pack or worse, then unleashes a
+  // monster kick through the final stretch. The wire cam tracks the charge.
+  dramaCloser = deerObjs[Math.floor(Math.random()*N)] || null;
+  if(dramaCloser){
+    dramaCloser.isCloser = true;
+    dramaCloser.base *= 0.94;   // runs off the pace early
+    dramaCloser.amp = Math.min(dramaCloser.amp, 0.22); // steady, saving ground
+  }
 }
 function beginRace(){
   configureRace();
@@ -811,10 +823,10 @@ function trackAttachments(){
     if(d.tag){
       const row=idxOf(d)%3;
       // In blimp mode tags float much higher so they're visible above the oval
-      const tagH = (camMode==='blimp') ? 18+row*4 : 4.9+row*0.95;
+      const tagH = (activeCam==='blimp') ? 12+row*3 : 4.9+row*0.95;
       d.tag.position.set(d.group.position.x, d.group.position.y+tagH, d.group.position.z);
       // Scale up for blimp — sprites are screen-space but position matters for occlusion
-      const tagSc = (camMode==='blimp') ? 9.0 : 5.2;
+      const tagSc = (activeCam==='blimp') ? 15.0 : 5.2;
       d.tag.scale.set(tagSc, tagSc*0.25, 1);
     }
     d.elf.rotation.y=d.group.rotation.y;
@@ -830,25 +842,39 @@ let photoFinish=[]; // {name, place, img}
 let photoQueue=[];  // deer waiting for photo capture at end of frame
 function capturePhotoFinish(d){
   if(photoFinish.length>=3) return;
-  const fp=trackPos(0,0);
-  // Save camera state (including up vector — blimp mode rolls it 90°)
+  // Save camera + renderer state (blimp rolls the up vector; canvas may be landscape)
   const sp=camera.position.clone(), sq=camera.quaternion.clone(), sf=camera.fov;
-  const su=camera.up.clone();
-  camera.up.set(0,1,0);  // force upright portrait — track at the bottom of the shot
-  // Side-on at the line — classic photo-finish framing on the crossing deer
-  camera.position.set(fp.x + TW/2 + 9, 1.9, fp.z - 6);
-  camera.lookAt(d.group.position.x, 1.7, d.group.position.z);
-  camera.fov=34; camera.updateProjectionMatrix();
+  const su=camera.up.clone(), sa=camera.aspect;
+  const sz=new THREE.Vector2(); renderer.getSize(sz);
+  // SNAP the deer so its NOSE is exactly on the line edge (nose ~1.3m ahead of centre)
+  const gpx=d.group.position.x, gpz=d.group.position.z, gry=d.group.rotation.y, gpy=d.group.position.y;
+  const lane = (d.stretchLane!==undefined && d.stretchLane!==null) ? d.stretchLane : d.curLane;
+  const snapP = P_FINISH - 1.3/CIRC;   // centre 1.3m before the line → nose ON the line
+  const spos = trackPos(snapP, lane);
+  d.group.position.set(spos.x, 0, spos.z); d.group.rotation.y=spos.ry;
+  // Camera EXACTLY on the finish-line axis — shooting straight down the line
+  // from the outside rail, the classic photo-finish alignment.
+  const camPt = trackPos(0, TW/2 + 10);   // on the line, outside the rail
+  const aimPt = trackPos(0, lane);        // on the line, at the deer's lane
+  camera.up.set(0,1,0);  // upright portrait — track at the bottom of the shot
+  camera.position.set(camPt.x, 1.7, camPt.z);
+  camera.lookAt(aimPt.x, 1.4, aimPt.z);
+  camera.fov=30;
+  // Force a PORTRAIT capture regardless of device orientation
+  renderer.setSize(480, 854, false);
+  camera.aspect=480/854; camera.updateProjectionMatrix();
   // Hide everything that could block the lens: gantry poles + entire fence
   finishPoles.forEach(p=>p.visible=false);
   if(fenceGroup) fenceGroup.visible=false;
   renderer.render(scene, camera);
-  const img=renderer.domElement.toDataURL('image/jpeg', 0.65);
+  const img=renderer.domElement.toDataURL('image/jpeg', 0.7);
   finishPoles.forEach(p=>p.visible=true);
   if(fenceGroup) fenceGroup.visible=true;
   photoFinish.push({name:d.name, place:d.place, img});
-  // Restore camera
-  camera.up.copy(su);
+  // Restore deer, camera, renderer
+  d.group.position.set(gpx, gpy, gpz); d.group.rotation.y=gry;
+  renderer.setSize(sz.x, sz.y, false);
+  camera.aspect=sa; camera.up.copy(su);
   camera.position.copy(sp); camera.quaternion.copy(sq);
   camera.fov=sf; camera.updateProjectionMatrix();
 }
@@ -910,18 +936,7 @@ function updateRace(dt){
       // Decelerate to a walk then stop — keep moving on the track
       d.speed = Math.max(0, d.speed - dt * 8);
       if(d.speed > 0.1){
-        // Final-stretch drama: closers surge in the last 15% — and the deepest
-    // closers swing WIDE and charge on the outside (Golden Tempo style)
-    const fracDone=(d.progress-P_GATE)/1.25;
-    if(fracDone>0.85){
-      const rank=topN(9).indexOf(d);
-      d.speed += rank*0.18*dt*8;          // deeper closers gain more speed
-      if(rank>=4){
-        // Swing out 2-3 lanes for the outside run
-        d.stretchLane = -(TW/2)+1.2 + 2.8 + (rank-4)*0.8;
-      }
-    }
-    d.progress += d.speed*dt/CIRC;
+        d.progress += d.speed*dt/CIRC;
         const fp=trackPos(d.progress, d.curLane);
         d.group.position.x=fp.x; d.group.position.z=fp.z;
         d.group.rotation.y=fp.ry; d.group.position.y=0;
@@ -932,16 +947,19 @@ function updateRace(dt){
     }
     // Speed
     d.speed=Math.max(2, d.base*(1+d.amp*Math.sin(d.surgeF*raceTime+d.surgeP))*(0.92+Math.random()*.16));
-    // Final-stretch drama: closers surge in the last 15% — and the deepest
-    // closers swing WIDE and charge on the outside (Golden Tempo style)
+    // Final-stretch drama: back-markers pick up a little late speed — and the
+    // designated CLOSER unleashes a monster kick, swinging wide Golden Tempo style
     const fracDone=(d.progress-P_GATE)/1.25;
     if(fracDone>0.85){
       const rank=topN(9).indexOf(d);
-      d.speed += rank*0.18*dt*8;          // deeper closers gain more speed
-      if(rank>=4){
-        // Swing out 2-3 lanes for the outside run
-        d.stretchLane = -(TW/2)+1.2 + 2.8 + (rank-4)*0.8;
-      }
+      d.speed += rank*0.12*dt*8;          // mild pack tightening
+    }
+    if(d.isCloser && fracDone>0.78){
+      // Ramp from 0 at 78% to full kick at 95% — a charge the field can't match
+      const kick = Math.min(1, (fracDone-0.78)/0.17);
+      d.speed *= 1 + kick*0.42;
+      // Swing 3 lanes wide for the outside charge
+      d.stretchLane = -(TW/2)+1.2 + 3.4;
     }
     d.progress += d.speed*dt/CIRC;
 
@@ -1056,13 +1074,15 @@ function directCamera(dt){
     // Broadcast-style directing — mirrors a real horse-race telecast:
     // few cuts, long continuous pans, telephoto on the backstretch,
     // head-on turning for home, one locked wire cam through the stretch.
-    if(raceTime<2 || prog<0.12){
-      autoPick='gate_crane';           // the break — high shot behind the gate
-    } else if(prog<0.40){
-      autoPick='grandstand';           // main pan cam — through turn 1 into backstretch
-    } else if(prog<0.48){
+    if(raceTime<5){
+      autoPick='gate_headon';          // the break — hold the head-on gate shot 5s
+    } else if(prog<0.20){
+      autoPick='wire';                 // first pass down the homestretch — wire cam pans
+    } else if(prog<0.45){
+      autoPick='grandstand';           // through turn 1 into the backstretch
+    } else if(prog<0.52){
       autoPick='blimp';                // single aerial establishing shot
-    } else if(prog<0.68){
+    } else if(prog<0.70){
       autoPick='telephoto';            // backstretch — long-lens compression
     } else if(prog<0.85){
       autoPick='headon_low';           // far turn — field turns for home
@@ -1071,13 +1091,29 @@ function directCamera(dt){
     }
     mode=autoPick;
   }
+  activeCam=mode;
 
   const ld=leader(), pc=packXZ();
   const raceFrac = ld ? Math.min(1,(ld.progress-P_GATE)/1.25) : 0;
   let tp=new THREE.Vector3(), ta=new THREE.Vector3(), sm=2.2;
   targetFov=54;
 
-  if(mode==='gate'){
+  if(mode==='gate_headon'){
+    // Identical framing to the pre-race shot — held as the field breaks and
+    // charges straight at the lens for the first five seconds.
+    const gp=trackPos(P_GATE,0), fp0=trackPos(0,0);
+    const ddx=gp.x-fp0.x, ddz=gp.z-fp0.z;
+    const dl=Math.sqrt(ddx*ddx+ddz*ddz)||1;
+    const nx=ddx/dl, nz=ddz/dl;
+    camPos.set(gp.x - nx*30, 3.5, gp.z - nz*30);
+    camAim.set(gp.x, 2.0, gp.z);
+    camera.position.copy(camPos); camera.up.set(0,1,0); camera.lookAt(camAim);
+    camLabel.innerHTML='<span class="rec">●</span> THE BREAK';
+    currentFov=targetFov=60;
+    camera.fov=60; camera.updateProjectionMatrix();
+    return;
+
+  } else if(mode==='gate'){
     const gp=trackPos(P_GATE,0);
     tp.set(gp.x, 4, gp.z-35); ta.set(gp.x, 2, gp.z+5);
     camLabel.innerHTML='<span class="rec">●</span> STARTING GATE'; targetFov=55; sm=1.5;
@@ -1110,19 +1146,17 @@ function directCamera(dt){
     camLabel.innerHTML='<span class="rec">●</span> CRANE'; targetFov=48; sm=1.5;
 
   } else if(mode==='blimp'){
-    // True blimp overhead: camera directly above oval centre, slight tilt to avoid
-    // gimbal lock. Rotated 90° from original — offset along Z instead of X, with
-    // up-vector rolled so the oval's long axis runs vertically on portrait screen.
-    const bx = TC_X;
-    const by = STR * 1.05;  // high enough to see full oval
-    const bz = TC_Z + 40;   // offset along Z now (was X) — rotates view 90°
-    camPos.set(bx, by, bz);
-    camAim.set(TC_X, 0, TC_Z);  // aim at oval centre
+    // Blimp tracks the PACK from above, zoomed in enough that deer and name
+    // tags are readable. Slight Z offset avoids gimbal lock; up-vector rolled
+    // 90° so the track direction reads vertically on a portrait screen.
+    const pk=packXZ();
+    camPos.set(pk.x, 175, pk.z + 32);
+    camAim.set(pk.x, 0, pk.z);
     camera.position.copy(camPos);
-    camera.up.set(1,0,0);  // rolled 90° so oval long axis reads vertical
+    camera.up.set(1,0,0);
     camera.lookAt(camAim);
-    currentFov=targetFov=70;
-    camera.fov=70; camera.updateProjectionMatrix();
+    currentFov=targetFov=58;
+    camera.fov=58; camera.updateProjectionMatrix();
     camLabel.innerHTML='<span class="rec">●</span> BLIMP';
     return;
 
@@ -1170,11 +1204,24 @@ function directCamera(dt){
     const hc=trackPos(-8/CIRC, TW/2+30);  // just past the line, high outside
     tp.set(hc.x, 26, hc.z);               // constant position — pan only
     const lf=leadersFrame();
-    ta.set(lf.x, 1.5, lf.z);              // aim tracks the leaders
+    let ax=lf.x, az=lf.z, sprd=lf.spread;
+    // DRAMA: if the closer is charging, blend the aim toward it and widen the
+    // frame so the come-from-behind run is always on screen.
+    if(dramaCloser && !dramaCloser.finished){
+      const cf=(dramaCloser.progress-P_GATE)/1.25;
+      if(cf>0.78){
+        const cp=dramaCloser.group.position;
+        ax = ax*0.68 + cp.x*0.32;
+        az = az*0.68 + cp.z*0.32;
+        const ld0=leader();
+        if(ld0) sprd = Math.max(sprd, Math.hypot(ld0.group.position.x-cp.x, ld0.group.position.z-cp.z)*1.1);
+      }
+    }
+    ta.set(ax, 1.5, az);
     // Zoomed when they're far up the stretch, easing wider as they near
-    const dx=lf.x-tp.x, dz=lf.z-tp.z;
+    const dx=ax-tp.x, dz=az-tp.z;
     const dist=Math.hypot(dx,dz);
-    targetFov=Math.max(16, Math.min(42, dist*0.16 + lf.spread*0.9));
+    targetFov=Math.max(16, Math.min(48, dist*0.16 + sprd*0.9));
     camLabel.innerHTML='<span class="rec">●</span> HOMESTRETCH'; sm=5.0;
 
   } else if(mode==='infield'){
@@ -1216,7 +1263,7 @@ function showResults(){
   // Photo finish strip — noses at the line
   const photos = photoFinish.map(p=>
     `<div style="display:inline-block;margin:3px;text-align:center">
-      <img src="${p.img}" style="width:104px;height:auto;border-radius:8px;border:2px solid #f4c95d;display:block">
+      <img src="${p.img}" style="width:150px;max-width:29vw;height:auto;border-radius:8px;border:2px solid #f4c95d;display:block">
       <span style="font-size:.68rem;color:#f4c95d;font-weight:700">${p.place}${['st','nd','rd'][p.place-1]||'th'} ${p.name}</span>
     </div>`).join('');
   const photoBlock = photos ?
@@ -1231,7 +1278,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.5</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.6</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
