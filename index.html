@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v7.4</title>
+<title>Reindeer Dash v7.5</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -16,6 +16,10 @@ canvas{display:block;}
 #leader{top:16px;right:18px;text-align:right;font-size:clamp(.85rem,1.5vw,1.2rem);font-weight:600;}
 #leader b{color:#f4c95d;}
 #timer{top:44px;right:18px;text-align:right;font-size:clamp(.7rem,1.2vw,1rem);color:#c6d2ec;font-variant-numeric:tabular-nums;}
+#pauseBtn{position:fixed;top:40px;right:76px;z-index:6;width:30px;height:30px;border-radius:50%;
+  border:1px solid rgba(255,255,255,.35);background:rgba(20,26,44,.55);color:#c6d2ec;
+  font-size:.85rem;line-height:1;cursor:pointer;display:none;}
+#pauseBtn:active{background:rgba(244,201,93,.6);color:#141a2c;}
 .camBar{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);display:flex;flex-wrap:wrap;
   justify-content:center;gap:.4rem;z-index:6;max-width:98vw;}
 .camBar button{pointer-events:auto;cursor:pointer;border:none;font-family:'Fredoka';font-weight:600;
@@ -60,6 +64,7 @@ canvas{display:block;}
 <div class="hud" id="camLabel"><span class="rec">●</span> AERIAL</div>
 <div class="hud" id="leader"></div>
 <div class="hud" id="timer"></div>
+<button id="pauseBtn" title="Pause / Play">⏸</button>
 <div class="camBar" id="camBar">
   <button data-cam="auto" class="active">Auto</button>
   <button data-cam="gate">Gate</button>
@@ -74,7 +79,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.4</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.5</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -125,7 +130,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v7.4';
+const VERSION='v7.5';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -210,6 +215,7 @@ const TC_X = 0, TC_Z = STR / 2;
 let scene, camera, renderer, clock;
 let deerObjs=new Array(N).fill(null), deerLoaded=0, deerScale=1, autoScaleDone=false;
 let racing=false, raceTime=0, finishCounter=0, finishedAll=false, postTimer=0;
+let paused=false;
 let preRace=false, preRaceTimer=0;
 const PRE_RACE_DUR=5.0; // seconds of gate head-on before gates open
 let camMode='auto', autoPick='gate', autoCutTimer=0;
@@ -226,6 +232,12 @@ const startBtn  = document.getElementById('startBtn');
 const camLabel  = document.getElementById('camLabel');
 const leaderEl  = document.getElementById('leader');
 const timerEl   = document.getElementById('timer');
+const pauseBtn  = document.getElementById('pauseBtn');
+pauseBtn.addEventListener('click',()=>{
+  if(!racing) return;             // only meaningful during the race
+  paused=!paused;
+  pauseBtn.textContent = paused ? '▶' : '⏸';
+});
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 function init(){
@@ -260,7 +272,7 @@ function init(){
   // INFIELD — green oval interior. Use full circles at each end + wide rect to fill gaps.
   {
     const infM=new THREE.MeshStandardMaterial({color:0x2d7a1a,roughness:.9});
-    const ri=TR-TW/2-1.5; // inner infield radius
+    const ri=TR-TW/2+0.5; // inner infield radius — overlaps under inner curb, no brown gap
     // Central rectangle spanning the two straights (full width between turn centres)
     const rect=new THREE.Mesh(new THREE.BoxGeometry(ri*2,0.05,STR),infM);
     rect.position.set(0,0.02,STR/2);
@@ -319,16 +331,19 @@ function init(){
 // ── GROUND ────────────────────────────────────────────────────────────────────
 function buildGround(){
   const g = new THREE.Mesh(
-    new THREE.PlaneGeometry(800, 800),
+    new THREE.PlaneGeometry(2400, 2400),
     new THREE.MeshStandardMaterial({color: 0x6b4423, roughness: 0.95}) // rich dirt brown
   );
   g.rotation.x = -Math.PI/2;
+  g.position.set(TC_X, 0, TC_Z);  // centre on the oval so the far turn is never off the edge
   g.receiveShadow = true;
   scene.add(g);
 }
 
 // ── OVAL TRACK VISUAL ─────────────────────────────────────────────────────────
 function buildOvalTrack(){
+  fenceGroup = new THREE.Group();  // all posts + rails — hidden during photo-finish capture
+  scene.add(fenceGroup);
   const railMat  = new THREE.MeshStandardMaterial({color:0x222222,roughness:.3});
   const postMat  = new THREE.MeshStandardMaterial({color:0xcc3344,roughness:.4,emissive:0x881122,emissiveIntensity:.5});
   const curbMat  = new THREE.MeshStandardMaterial({color:0xffffff,roughness:.2,emissive:0xffffff,emissiveIntensity:.8});
@@ -367,11 +382,13 @@ function buildOvalTrack(){
       seg.position.y = s * stripeH + stripeH/2;
       g.add(seg);
     }
-    // Hook: torus arc at the top, tilted to face outward like a candy cane hook
-    const hookGeo = new THREE.TorusGeometry(radius*2.5, radius*0.7, 8, 12, Math.PI);
+    // Crook: half-torus in a vertical plane forming an upside-down J.
+    // Torus centred at (hookR, height, 0); arc runs from staff top (0,height)
+    // up and over to (2*hookR, height) — hook opens toward local +X.
+    const hookR = radius*3;
+    const hookGeo = new THREE.TorusGeometry(hookR, radius*0.85, 8, 14, Math.PI);
     const hook = new THREE.Mesh(hookGeo, redMat);
-    hook.position.y = height + radius*2.5;
-    hook.rotation.z = Math.PI/2;  // arc curves sideways
+    hook.position.set(hookR, height, 0);  // vertical XY plane — no extra rotation needed
     g.add(hook);
     return g;
   }
@@ -382,8 +399,14 @@ function buildOvalTrack(){
       const a=trackPos(u0,off), b=trackPos(u1,off);
       const cane = makeCandyCane(2.8, 0.22);
       cane.position.set(a.x, 0, a.z);
-      cane.rotation.y = a.ry;  // orient hook to face outward from track
-      scene.add(cane);
+      // Hook must face AWAY from the horses (away from track surface):
+      // radial direction from track centreline outward through this post.
+      const c0=trackPos(u0,0);
+      let ax=a.x-c0.x, az=a.z-c0.z;
+      const al=Math.sqrt(ax*ax+az*az)||1; ax/=al; az/=al;
+      // rotation.y = t maps local +X to world (cos t, 0, -sin t)
+      cane.rotation.y = Math.atan2(-az, ax);
+      fenceGroup.add(cane);
       const mx=(a.x+b.x)/2, mz=(a.z+b.z)/2;
       const dx=b.x-a.x, dz=b.z-a.z;
       const len=Math.sqrt(dx*dx+dz*dz)+.05;
@@ -391,7 +414,7 @@ function buildOvalTrack(){
         const rail=new THREE.Mesh(new THREE.BoxGeometry(len,.22,.38),caneRailMat);
         rail.position.set(mx,ry,mz);
         rail.rotation.y=-Math.atan2(dz,dx);
-        scene.add(rail);
+        fenceGroup.add(rail);
       });
     });
   }
@@ -701,6 +724,7 @@ function setupDeer(deerScene, runClip, idleClip, idx){
 // ── RACE SETUP ────────────────────────────────────────────────────────────────
 function configureRace(){
   raceTime=0; finishCounter=0; finishedAll=false; postTimer=0;
+  paused=false; if(typeof pauseBtn!=='undefined') pauseBtn.textContent='⏸';
   winnerCamActive=false; winnerCamTimer=0; preRace=false;
   gateOpenAnim=0; gateDoors.forEach(h=>h.rotation.x=0); // close doors
   photoFinish=[]; photoQueue=[];
@@ -799,6 +823,7 @@ function trackAttachments(){
 
 // ── PHOTO FINISH ──────────────────────────────────────────────────────────────
 let finishPoles=[]; // gantry poles — hidden during photo capture
+let fenceGroup=null; // posts + rails — hidden during photo capture so nothing blocks the lens
 let finishLineGroup=[]; // banner + stripe — hidden at race start, restored when last deer exits turn 1
 let finishLineHidden=false;
 let photoFinish=[]; // {name, place, img}
@@ -806,19 +831,24 @@ let photoQueue=[];  // deer waiting for photo capture at end of frame
 function capturePhotoFinish(d){
   if(photoFinish.length>=3) return;
   const fp=trackPos(0,0);
-  // Save camera state
+  // Save camera state (including up vector — blimp mode rolls it 90°)
   const sp=camera.position.clone(), sq=camera.quaternion.clone(), sf=camera.fov;
+  const su=camera.up.clone();
+  camera.up.set(0,1,0);  // force upright portrait — track at the bottom of the shot
   // Side-on at the line — classic photo-finish framing on the crossing deer
-  // Offset along track so the finish post doesn't block the lens
   camera.position.set(fp.x + TW/2 + 9, 1.9, fp.z - 6);
   camera.lookAt(d.group.position.x, 1.7, d.group.position.z);
   camera.fov=34; camera.updateProjectionMatrix();
+  // Hide everything that could block the lens: gantry poles + entire fence
   finishPoles.forEach(p=>p.visible=false);
+  if(fenceGroup) fenceGroup.visible=false;
   renderer.render(scene, camera);
   const img=renderer.domElement.toDataURL('image/jpeg', 0.65);
   finishPoles.forEach(p=>p.visible=true);
+  if(fenceGroup) fenceGroup.visible=true;
   photoFinish.push({name:d.name, place:d.place, img});
   // Restore camera
+  camera.up.copy(su);
   camera.position.copy(sp); camera.quaternion.copy(sq);
   camera.fov=sf; camera.updateProjectionMatrix();
 }
@@ -1007,14 +1037,15 @@ function directCamera(dt){
     const dx = gp.x - fp.x, dz = gp.z - fp.z;
     const dist = Math.sqrt(dx*dx+dz*dz);
     const nx = dx/dist, nz = dz/dist;   // unit vector from finish toward gate
-    // Stand close in front of the gate (between gate and finish, but near the gate)
-    // so the horses fill the frame, not the open stretch behind them.
-    camPos.set(gp.x - nx*14, 3.2, gp.z - nz*14);
-    camAim.set(gp.x, 2.2, gp.z);
+    // Head-on shot framing ALL 9 horses across the gate.
+    // Gate width = 9 x 1.6m = 14.4m. PORTRAIT aspect (~0.46) shrinks horizontal
+    // FOV: at vertical FOV 60 horizontal is ~30°, so 30m out covers ~16m width.
+    camPos.set(gp.x - nx*30, 3.5, gp.z - nz*30);
+    camAim.set(gp.x, 2.0, gp.z);
     camera.position.copy(camPos); camera.lookAt(camAim);
     camLabel.innerHTML='<span class="rec">●</span> STARTING GATE';
-    currentFov=targetFov=32;
-    camera.fov=32; camera.updateProjectionMatrix();
+    currentFov=targetFov=60;
+    camera.fov=60; camera.updateProjectionMatrix();
     return;
   }
 
@@ -1022,39 +1053,21 @@ function directCamera(dt){
   if(mode==='auto'){
     const ld=leader();
     const prog=ld ? Math.min(1,(ld.progress-P_GATE)/1.25) : 0;
-
-    if(raceTime<1.5){
-      // Gates just opened — locked crane behind the gate
-      autoPick='gate_crane';
-    } else if(prog<0.16){
-      // Through the first curve — crane follows from high behind
-      autoPick='gate_crane';
-    } else if(prog<0.28){
-      // High angle — crane/blimp
-      autoCutTimer-=dt;
-      if(autoCutTimer<=0){
-        const pool=['crane','crane','blimp','grandstand'];
-        let pick; do{pick=pool[Math.floor(Math.random()*pool.length)];}while(pick===autoPick);
-        autoPick=pick; autoCutTimer=3.5+Math.random()*2;
-      }
-    } else if(prog<0.55){
-      // Backstretch — aerial/blimp/infield cuts
-      autoCutTimer-=dt;
-      if(autoCutTimer<=0){
-        const pool=['blimp','blimp','infield','crane','blimp'];
-        let pick; do{pick=pool[Math.floor(Math.random()*pool.length)];}while(pick===autoPick);
-        autoPick=pick; autoCutTimer=3+Math.random()*2;
-      }
-    } else if(prog<0.72){
-      // Far turn — telephoto compression
-      if(autoPick!=='telephoto'){ autoPick='telephoto'; autoCutTimer=999; }
+    // Broadcast-style directing — mirrors a real horse-race telecast:
+    // few cuts, long continuous pans, telephoto on the backstretch,
+    // head-on turning for home, one locked wire cam through the stretch.
+    if(raceTime<2 || prog<0.12){
+      autoPick='gate_crane';           // the break — high shot behind the gate
+    } else if(prog<0.40){
+      autoPick='grandstand';           // main pan cam — through turn 1 into backstretch
+    } else if(prog<0.48){
+      autoPick='blimp';                // single aerial establishing shot
+    } else if(prog<0.68){
+      autoPick='telephoto';            // backstretch — long-lens compression
     } else if(prog<0.85){
-      // Home stretch approach — head-on low
-      if(autoPick!=='headon_low'){ autoPick='headon_low'; autoCutTimer=999; }
+      autoPick='headon_low';           // far turn — field turns for home
     } else {
-      // Final turn to the wire — ONE continuous panning homestretch shot.
-      // No camera switching from here until everyone is home.
-      if(autoPick!=='wire'){ autoPick='wire'; autoCutTimer=999; }
+      autoPick='wire';                 // stretch run — locked, no cuts to the line
     }
     mode=autoPick;
   }
@@ -1218,7 +1231,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.4</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.5</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
@@ -1312,6 +1325,8 @@ function animate(){
   requestAnimationFrame(animate);
   const dt=Math.min(0.05, clock.getDelta());
   // snow removed
+  pauseBtn.style.display = racing ? 'block' : 'none';
+  if(paused && racing){ renderer.render(scene, camera); return; }
   if(racing) updateRace(dt);
   else if(preRace){
     // Gate lineup — idle animation plays, elves stay seated, tags track
