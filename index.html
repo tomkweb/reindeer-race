@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v7.6</title>
+<title>Reindeer Dash v7.7</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -79,7 +79,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.6</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.7</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -130,7 +130,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v7.6';
+const VERSION='v7.7';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -1074,8 +1074,8 @@ function directCamera(dt){
     // Broadcast-style directing — mirrors a real horse-race telecast:
     // few cuts, long continuous pans, telephoto on the backstretch,
     // head-on turning for home, one locked wire cam through the stretch.
-    if(raceTime<5){
-      autoPick='gate_headon';          // the break — hold the head-on gate shot 5s
+    if(raceTime<2){
+      autoPick='gate_headon';          // the break — hold the head-on gate shot 2s
     } else if(prog<0.20){
       autoPick='wire';                 // first pass down the homestretch — wire cam pans
     } else if(prog<0.45){
@@ -1086,8 +1086,10 @@ function directCamera(dt){
       autoPick='telephoto';            // backstretch — long-lens compression
     } else if(prog<0.85){
       autoPick='headon_low';           // far turn — field turns for home
+    } else if(prog<0.90){
+      autoPick='wire';                 // stretch run — zoom tracks the late surge
     } else {
-      autoPick='wire';                 // stretch run — locked, no cuts to the line
+      autoPick='grandstand';           // halfway to the wire — side view to the line
     }
     mode=autoPick;
   }
@@ -1199,15 +1201,24 @@ function directCamera(dt){
 
   } else if(mode==='wire'){
     // HOMESTRETCH CAM — single continuous shot like the NBC broadcast:
-    // high camera near the finish, FIXED position, PANS with the leaders
-    // down the stretch and across the line. Never cuts away.
+    // high camera near the finish, FIXED position, PANS with the pack.
     const hc=trackPos(-8/CIRC, TW/2+30);  // just past the line, high outside
     tp.set(hc.x, 26, hc.z);               // constant position — pan only
     const lf=leadersFrame();
     let ax=lf.x, az=lf.z, sprd=lf.spread;
-    // DRAMA: if the closer is charging, blend the aim toward it and widen the
-    // frame so the come-from-behind run is always on screen.
-    if(dramaCloser && !dramaCloser.finished){
+    const earlyPass = raceFrac < 0.5;     // first trip down the stretch
+    if(earlyPass){
+      // Frame the WHOLE pack — aim at pack centre, radius covers every runner
+      const pk=packXZ();
+      ax=pk.x; az=pk.z;
+      let r=4;
+      deerObjs.forEach(d=>{ if(d && !d.finished){
+        r=Math.max(r, Math.hypot(d.group.position.x-ax, d.group.position.z-az));
+      }});
+      sprd=r*2;
+    } else if(dramaCloser && !dramaCloser.finished){
+      // DRAMA: blend the aim toward the charging closer and widen the frame
+      // so the come-from-behind run is always on screen.
       const cf=(dramaCloser.progress-P_GATE)/1.25;
       if(cf>0.78){
         const cp=dramaCloser.group.position;
@@ -1218,10 +1229,13 @@ function directCamera(dt){
       }
     }
     ta.set(ax, 1.5, az);
-    // Zoomed when they're far up the stretch, easing wider as they near
+    // REAL LENS OPTICS: FOV that exactly fits the subject at its distance —
+    // long-lens tight when they're far up the stretch, widening automatically
+    // as they bear down on the camera so nobody leaves the frame.
     const dx=ax-tp.x, dz=az-tp.z;
-    const dist=Math.hypot(dx,dz);
-    targetFov=Math.max(16, Math.min(48, dist*0.16 + sprd*0.9));
+    const dist=Math.max(8, Math.hypot(dx,dz));
+    const halfW = sprd*0.5 + 5;           // half-extent to fit, plus margin
+    targetFov=Math.max(18, Math.min(75, 2*Math.atan(halfW/dist)*180/Math.PI));
     camLabel.innerHTML='<span class="rec">●</span> HOMESTRETCH'; sm=5.0;
 
   } else if(mode==='infield'){
@@ -1278,7 +1292,7 @@ function showResults(){
   overlay.classList.remove('off');
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.6</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.7</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
