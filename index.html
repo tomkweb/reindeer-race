@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v7.9</title>
+<title>Reindeer Dash v8.0</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -20,6 +20,9 @@ canvas{display:block;}
   border:1px solid rgba(255,255,255,.35);background:rgba(20,26,44,.55);color:#c6d2ec;
   font-size:.85rem;line-height:1;cursor:pointer;display:none;}
 #pauseBtn:active{background:rgba(244,201,93,.6);color:#141a2c;}
+#replayExit{position:fixed;top:40px;left:18px;z-index:6;display:none;padding:.35rem .7rem;
+  border-radius:18px;border:1px solid rgba(255,255,255,.35);background:rgba(20,26,44,.65);
+  color:#f4c95d;font-weight:700;font-size:.75rem;cursor:pointer;}
 .camBar{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);display:flex;flex-wrap:wrap;
   justify-content:center;gap:.4rem;z-index:6;max-width:98vw;}
 .camBar button{pointer-events:auto;cursor:pointer;border:none;font-family:'Fredoka';font-weight:600;
@@ -65,6 +68,7 @@ canvas{display:block;}
 <div class="hud" id="leader"></div>
 <div class="hud" id="timer"></div>
 <button id="pauseBtn" title="Pause / Play">⏸</button>
+<button id="replayExit">⏹ END REPLAY</button>
 <div class="camBar" id="camBar">
   <button data-cam="auto" class="active">Auto</button>
   <button data-cam="gate">Gate</button>
@@ -79,7 +83,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.9</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.0</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -130,7 +134,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v7.9';
+const VERSION='v8.0';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -221,6 +225,9 @@ let dramaCloserWins=true; // ~80% of races the charge gets there; sometimes a no
 let raceCount=0, grinchRace=false;  // every 3rd race the Grinch steals it
 let grinch=null;  // built lazily on the first Grinch race
 let activeCam='auto';  // the camera actually rendering this frame (resolves 'auto' picks)
+// INSTANT REPLAY — race state recorded ~30fps from the final turn to the wire
+let replayFrames=[], replayRec=false, replayActive=false, replayT=0, lastRecT=-1;
+const REPLAY_SLOW_PROG = 2.0 - 183/CIRC;   // last 200 yards (183m) → slow motion
 let preRace=false, preRaceTimer=0;
 const PRE_RACE_DUR=5.0; // seconds of gate head-on before gates open
 let camMode='auto', autoPick='gate', autoCutTimer=0;
@@ -238,6 +245,7 @@ const camLabel  = document.getElementById('camLabel');
 const leaderEl  = document.getElementById('leader');
 const timerEl   = document.getElementById('timer');
 const pauseBtn  = document.getElementById('pauseBtn');
+document.getElementById('replayExit').addEventListener('click',()=>{ if(replayActive) endReplay(); });
 pauseBtn.addEventListener('click',()=>{
   if(!racing) return;             // only meaningful during the race
   paused=!paused;
@@ -774,6 +782,7 @@ function configureRace(){
     grinch.finished=false; grinch.place=0; grinch.progress=0;
     grinch.dropping=false; grinch.landed=false; grinch.speed=0; grinch.dropY=0;
   }
+  replayFrames=[]; replayRec=false; replayActive=false; replayT=0; lastRecT=-1;
 }
 function beginRace(){
   configureRace();
@@ -1010,6 +1019,70 @@ function capturePhotoFinish(d){
   camera.position.copy(sp); camera.quaternion.copy(sq);
   camera.fov=sf; camera.updateProjectionMatrix();
 }
+// ── INSTANT REPLAY playback ──────────────────────────────
+function startReplay(){
+  if(replayFrames.length<2) return;
+  replayActive=true; replayT=replayFrames[0].t;
+  overlay.classList.add('off');
+  document.getElementById('replayExit').style.display='block';
+  // Deer were crossfaded to idle after the race — put them back at a run
+  deerObjs.forEach(d=>{ if(d){ d.idleAct.stop(); d.action.reset().play(); } });
+}
+function endReplay(){
+  replayActive=false;
+  document.getElementById('replayExit').style.display='none';
+  deerObjs.forEach(d=>{ if(d){ d.action.stop(); d.idleAct.reset().play(); } });
+  showResults();
+}
+function updateReplay(dt){
+  const frames=replayFrames, last=frames[frames.length-1];
+  let i=0;
+  while(i<frames.length-2 && frames[i+1].t<=replayT) i++;
+  const a=frames[i], b=frames[Math.min(i+1,frames.length-1)];
+  const span=Math.max(1e-4, b.t-a.t);
+  const f=Math.max(0, Math.min(1,(replayT-a.t)/span));
+  const L=(x,y)=>x+(y-x)*f;
+  const slow = a.lp>=REPLAY_SLOW_PROG;         // last 200 yards
+  const rate = slow?0.28:1.0;
+  deerObjs.forEach((d,k)=>{ if(!d) return;
+    const j=k*4;
+    d.group.position.set(L(a.d[j],b.d[j]), L(a.d[j+2],b.d[j+2]), L(a.d[j+1],b.d[j+1]));
+    d.group.rotation.y=L(a.d[j+3],b.d[j+3]);
+    d.mixer.timeScale=1.5*rate; d.mixer.update(dt);
+  });
+  if(grinch){
+    if(a.g||b.g){
+      const ga=a.g||b.g, gb=b.g||a.g;
+      grinch.group.visible=true; grinch.tag.visible=true;
+      grinch.group.position.set(L(ga[0],gb[0]), L(ga[2],gb[2]), L(ga[1],gb[1]));
+      grinch.group.rotation.y=L(ga[3],gb[3]);
+      grinch.tag.position.set(grinch.group.position.x, grinch.group.position.y+4.0, grinch.group.position.z);
+    } else { grinch.group.visible=false; grinch.tag.visible=false; }
+  }
+  trackAttachments();
+  // Replay camera — outside-rail tracking; drops low + tight for the slo-mo
+  const fx=L(a.fx,b.fx), fz=L(a.fz,b.fz);
+  let px,pz,py,fov;
+  if(!slow){
+    if(fz>STR){
+      // Still on the final turn — offset radially outward from the turn centre
+      let rx=fx-0, rz=fz-STR; const rl=Math.hypot(rx,rz)||1; rx/=rl; rz/=rl;
+      px=fx+rx*26; pz=fz+rz*26; py=8; fov=44;
+    } else { px=fx+TW/2+14; pz=fz; py=6; fov=44; }
+    camLabel.innerHTML='<span class="rec">●</span> INSTANT REPLAY';
+  } else {
+    px=fx+TW/2+8; pz=fz; py=2.4; fov=34;
+    camLabel.innerHTML='<span class="rec">●</span> REPLAY — SLO-MO';
+  }
+  const sm=1-Math.exp(-4*dt);
+  camPos.lerp(new THREE.Vector3(px,py,pz), sm);
+  camAim.lerp(new THREE.Vector3(fx,1.6,fz), sm);
+  camera.position.copy(camPos); camera.up.set(0,1,0); camera.lookAt(camAim);
+  camera.fov += (fov-camera.fov)*sm; camera.updateProjectionMatrix();
+  replayT += dt*rate;
+  if(replayT > last.t + 0.4) endReplay();
+}
+
 function raceWinner(){
   if(grinch && grinch.place===1) return grinch;
   return deerObjs.find(d=>d&&d.place===1) || null;
@@ -1171,6 +1244,28 @@ function updateRace(dt){
   });
 
   updateGrinch(dt);
+
+  // REPLAY RECORDING — starts as the leader rounds into the final turn
+  {
+    const ldR=leader();
+    if(ldR){
+      const lfR=(ldR.progress-P_GATE)/1.25;
+      if(!replayRec && lfR>=0.70) replayRec=true;
+      if(replayRec && raceTime-lastRecT>=1/30 && replayFrames.length<3000){
+        lastRecT=raceTime;
+        const t3=topN(3);
+        let fx=0,fz=0; t3.forEach(o=>{fx+=o.group.position.x; fz+=o.group.position.z;});
+        fx/=t3.length; fz/=t3.length;
+        const dd=[];
+        deerObjs.forEach(o=>{ if(o) dd.push(o.group.position.x,o.group.position.z,o.group.position.y,o.group.rotation.y); });
+        let gg=null;
+        if(grinch && grinch.group.visible){
+          gg=[grinch.group.position.x,grinch.group.position.z,grinch.group.position.y,grinch.group.rotation.y];
+        }
+        replayFrames.push({t:raceTime, lp:ldR.progress, fx, fz, d:dd, g:gg});
+      }
+    }
+  }
   trackAttachments();
 
   // Photo finish — captured now that deer, elf, tag, nose are all in final positions
@@ -1471,13 +1566,16 @@ function showResults(){
     <h2>🏆 ${winnerName} wins!</h2>${photoBlock}${rows}
     <div class="credit">Model: "Deer Animation" by DarryleH · CC-BY-4.0 · sketchfab.com · ${VERSION}</div>
     <div style="margin-top:1.1rem">
+      ${replayFrames.length>1?'<button class="bigBtn" id="replayBtn" style="display:block;margin-bottom:.7rem;background:linear-gradient(180deg,#7cc4f0,#3f8fc4);box-shadow:0 6px 0 #1d5a85">📺 Instant Replay</button>':''}
       <button class="bigBtn" id="again" style="display:block">Race Again</button>
     </div>
   </div></div>`;
   overlay.classList.remove('off');
+  const rb=document.getElementById('replayBtn');
+  if(rb) rb.addEventListener('click', startReplay);
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v7.9</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.0</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
@@ -1572,6 +1670,7 @@ function animate(){
   const dt=Math.min(0.05, clock.getDelta());
   // snow removed
   pauseBtn.style.display = racing ? 'block' : 'none';
+  if(replayActive){ updateReplay(dt); renderer.render(scene, camera); return; }
   if(paused && racing){ renderer.render(scene, camera); return; }
   if(racing) updateRace(dt);
   else if(preRace){
