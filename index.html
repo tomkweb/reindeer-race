@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v8.2</title>
+<title>Reindeer Dash v8.3</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -109,7 +109,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.2</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.3</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -160,7 +160,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v8.2';
+const VERSION='v8.3';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -260,39 +260,80 @@ function say(txt, opts={}){
     speechSynthesis.speak(u);
   }catch(e){}
 }
+const pick=arr=>arr[Math.floor(Math.random()*arr.length)];
 function announcerUpdate(){
   if(!racing) return;
   const ld=leader(); if(!ld) return;
   const frac=(ld.progress-P_GATE)/1.25;
   const F=ann.flags;
-  // one-shot landmark calls
-  if(!F.back && frac>=0.30){ F.back=true; say('Down the backstretch they go!'); }
-  if(!F.far && frac>=0.68){ F.far=true; say('Around the final turn!'); }
+  // Excitement escalates with the race — faster and higher as they get closer to home
+  const exR=1.08+frac*0.28, exP=1.02+frac*0.22;
+  // ── landmark calls, varied phrasing ──
+  if(!F.q1 && frac>=0.15){ F.q1=true;
+    say(pick([`${ld.name} breaks on top as they head into the first turn!`,
+      `Into the first turn, and it's ${ld.name} showing the way!`]),{rate:exR,pitch:exP}); }
+  if(!F.back && frac>=0.30){ F.back=true;
+    say(pick(['Down the backstretch they go!',
+      'They hit the backstretch — and the pace is HOT!',
+      `Down the back side, ${ld.name} clinging to the lead!`]),{rate:exR,pitch:exP}); }
+  if(!F.half && frac>=0.50){ F.half=true;
+    const t2=topN(2);
+    say(pick([`Halfway home! ${t2[0].name} and ${t2[1].name} are putting on a show!`,
+      `At the half, it's ${t2[0].name}! But this pack is TIGHT!`]),{rate:exR,pitch:exP}); }
+  if(!F.far && frac>=0.68){ F.far=true;
+    say(pick(['Around the final turn — here they come!',
+      'They lean into the final turn! Hold onto your hats!',
+      `Final turn! ${ld.name} in front, but ANYBODY can win this!`]),{force:true,rate:exR,pitch:exP}); }
   if(!F.stretch && frac>=0.85){ F.stretch=true;
     const t2=topN(2);
-    say(`Down the stretch they come! It's ${t2[0].name} and ${t2[1]?t2[1].name:''}!`,{force:true,rate:1.28,pitch:1.15}); }
+    say(pick([`DOWN THE STRETCH THEY COME! It's ${t2[0].name} and ${t2[1]?t2[1].name:''}!`,
+      `They turn for home! ${t2[0].name} digs in — ${t2[1]?t2[1].name:''} won't go away!`]),{force:true,rate:1.32,pitch:1.22}); }
+  if(!F.duel && frac>=0.93){ F.duel=true;
+    const t2=topN(2);
+    if(t2.length>1) say(`It's ${t2[0].name}! It's ${t2[1].name}! Side by side to the wire!`,{force:true,rate:1.35,pitch:1.25}); }
   if(!F.closer && dramaCloser && !dramaCloser.finished && frac>=0.83){ F.closer=true;
-    say(`And here comes ${dramaCloser.name}, flying on the outside!`,{force:true,rate:1.3,pitch:1.2}); }
-  // lead changes (pre-drive, throttled)
+    say(pick([`WAIT — here comes ${dramaCloser.name}, FLYING on the outside!`,
+      `${dramaCloser.name} has found another gear! What a run!`,
+      `Out of NOWHERE — ${dramaCloser.name} is charging down the middle of the track!`]),{force:true,rate:1.32,pitch:1.25}); }
+  // ── lead changes ──
   const li=deerObjs.indexOf(ld);
   if(li!==ann.lastLeadIdx){
-    if(ann.lastLeadIdx>=0 && frac>0.06 && frac<0.80 && raceTime-ann.lastLeadT>5){
-      say(`${ld.name} takes the lead!`,{rate:1.2});
+    if(ann.lastLeadIdx>=0 && frac>0.06 && frac<0.80 && raceTime-ann.lastLeadT>4){
+      say(pick([`${ld.name} takes the lead!`,
+        `And now it's ${ld.name} in front!`,
+        `${ld.name} surges to the front!`,
+        `${ld.name} says not so fast — and takes over!`]),{rate:exR,pitch:exP});
       ann.lastLeadT=raceTime;
     }
     ann.lastLeadIdx=li;
   }
-  // periodic order call
-  if(frac>0.10 && frac<0.66 && raceTime-ann.lastCall>10){
+  // ── periodic colour calls with gap description (a length ≈ 2.5m) ──
+  if(frac>0.08 && frac<0.66 && raceTime-ann.lastCall>7){
     ann.lastCall=raceTime;
     const t2=topN(2);
-    if(t2.length>1) say(`${t2[0].name} in front, ${t2[1].name} close behind.`,{rate:1.1});
+    if(t2.length>1){
+      const gapM=(t2[0].progress-t2[1].progress)*CIRC;
+      const gapTxt = gapM<1.5 ? pick(['nose to nose','neck and neck','locked together'])
+        : gapM<4 ? 'by a length'
+        : `by ${Math.round(gapM/2.5)} lengths`;
+      say(pick([`${t2[0].name} leads ${t2[1].name}, ${gapTxt}!`,
+        `It's ${t2[0].name} and ${t2[1].name}, ${gapTxt}!`,
+        `${t2[0].name} out front ${gapTxt}, ${t2[1].name} stalking!`]),{rate:exR,pitch:exP});
+    }
   }
-  // winner call
+  // ── winner + placings ──
   if(!F.win && finishCounter>0){ F.win=true;
     const w=raceWinner();
-    if(w===grinch) say('The Grinch steals the race! Unbelievable!',{force:true,rate:1.25,pitch:1.2});
-    else if(w) say(`${w.name} wins it!`,{force:true,rate:1.2,pitch:1.15});
+    if(w===grinch) say(pick(['THE GRINCH STEALS THE RACE! UNBELIEVABLE!',
+      'The Grinch WINS IT! You hate to see it, folks!']),{force:true,rate:1.28,pitch:1.22});
+    else if(w) say(pick([`${w.name} WINS IT!`,
+      `${w.name} gets there! What a finish!`,
+      `At the wire — it's ${w.name}!`]),{force:true,rate:1.25,pitch:1.2});
+  }
+  if(!F.placed && finishCounter>=3){ F.placed=true;
+    const p2=deerObjs.find(d=>d&&d.place===2)||( grinch&&grinch.place===2?grinch:null);
+    const p3=deerObjs.find(d=>d&&d.place===3);
+    if(p2&&p3) say(`${p2.name} takes second, ${p3.name} holds on for third!`,{rate:1.15,pitch:1.1});
   }
 }
 let dramaCloser=null;  // the designated come-from-behind runner this race
@@ -840,9 +881,9 @@ function configureRace(){
     d.flightProg=-1; d.nextFlight=2.5+Math.random()*4;
     d.base   = 13.6 + Math.random()*0.8; // tight spread — nobody runs away with it
     d.isCloser = false;                // drama closer — assigned below
-    d.surgeF = 0.55 + Math.random()*1.4;
+    d.surgeF = 0.14 + Math.random()*0.22; // slow surges → leaders hold for stretches
     d.surgeP = Math.random()*Math.PI*2;
-    d.amp    = 0.28 + Math.random()*0.30;  // bigger surges → constant lead changes
+    d.amp    = 0.11 + Math.random()*0.10;  // ~20 lead changes a race, not 70
     d.speed  = d.base;
     const sp=trackPos(P_GATE, d.laneOff);
     d.group.position.set(sp.x, 0, sp.z);
@@ -977,12 +1018,24 @@ function buildGrinch(){
 const SPARK_N=160;
 let sparkPts=null;
 const sparks=[];
+const SPARK_COLORS=[[1,.25,.25],[1,.85,.2],[.3,1,.4],[.35,.75,1],[1,.4,.9],[.7,.4,1],[1,1,1]];
 function initSparkles(){
   const geo=new THREE.BufferGeometry();
   const pos=new Float32Array(SPARK_N*3);
+  const col=new Float32Array(SPARK_N*3);
   for(let i=0;i<SPARK_N;i++){ pos[i*3+1]=-999; sparks.push({life:0}); }
   geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
-  const mat=new THREE.PointsMaterial({color:0xffd75e,size:1.6,transparent:true,
+  geo.setAttribute('color', new THREE.BufferAttribute(col,3));
+  // Round soft-glow sprite — without a texture, points render as hard squares
+  const cv=document.createElement('canvas'); cv.width=cv.height=64;
+  const c2=cv.getContext('2d');
+  const grad=c2.createRadialGradient(32,32,0,32,32,32);
+  grad.addColorStop(0,'rgba(255,255,255,1)');
+  grad.addColorStop(0.35,'rgba(255,255,255,.9)');
+  grad.addColorStop(1,'rgba(255,255,255,0)');
+  c2.fillStyle=grad; c2.fillRect(0,0,64,64);
+  const tex=new THREE.CanvasTexture(cv);
+  const mat=new THREE.PointsMaterial({size:2.4,map:tex,vertexColors:true,transparent:true,
     opacity:.95,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true});
   sparkPts=new THREE.Points(geo,mat);
   sparkPts.frustumCulled=false;
@@ -991,17 +1044,21 @@ function initSparkles(){
 let sparkEmitIdx=0;
 function emitSparkles(x,y,z,n){
   if(!sparkPts) initSparkles();
+  const col=sparkPts.geometry.attributes.color.array;
   for(let k=0;k<n;k++){
     const i=sparkEmitIdx; sparkEmitIdx=(sparkEmitIdx+1)%SPARK_N;
     const s=sparks[i];
     s.life=0.7+Math.random()*0.6;
-    s.x=x+(Math.random()-0.5)*1.4;
-    s.y=y+0.6+Math.random()*2.2;
-    s.z=z+(Math.random()-0.5)*1.4;
-    s.vx=(Math.random()-0.5)*2.2;
-    s.vy=0.6+Math.random()*2.4;
-    s.vz=(Math.random()-0.5)*2.2;
+    s.x=x+(Math.random()-0.5)*1.6;
+    s.y=y+0.6+Math.random()*2.4;
+    s.z=z+(Math.random()-0.5)*1.6;
+    s.vx=(Math.random()-0.5)*2.6;
+    s.vy=0.6+Math.random()*2.6;
+    s.vz=(Math.random()-0.5)*2.6;
+    const c=SPARK_COLORS[Math.floor(Math.random()*SPARK_COLORS.length)];
+    col[i*3]=c[0]; col[i*3+1]=c[1]; col[i*3+2]=c[2];
   }
+  sparkPts.geometry.attributes.color.needsUpdate=true;
 }
 function updateSparkles(dt){
   if(!sparkPts) return;
@@ -1047,7 +1104,8 @@ function updateGrinch(dt){
   if(grinch.dropping){
     grinch.dropY -= dt*34;                    // ~1.2s fall
     grinch.progress += ld.speed*dt/CIRC;      // drifts forward with the field
-    if(grinch.dropY<=0){ grinch.dropY=0; grinch.dropping=false; grinch.landed=true; grinch.speed=ld.speed; }
+    if(grinch.dropY<=0){ grinch.dropY=0; grinch.dropping=false; grinch.landed=true; grinch.speed=ld.speed;
+      say("He's on the track! The GRINCH is RUNNING, and he is NOT here to spread cheer!",{force:true,rate:1.3,pitch:1.28}); }
   } else if(grinch.landed && !grinch.finished){
     // Gap-aware steal — same maths as the closer, with Grinch-sized margins
     let rival=null;
@@ -1809,7 +1867,7 @@ function showResults(){
   if(rb) rb.addEventListener('click', startReplay);
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.2</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.3</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
