@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v8.4</title>
+<title>Reindeer Dash v8.5</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -109,7 +109,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.4</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.5</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -160,7 +160,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v8.4';
+const VERSION='v8.5';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -699,7 +699,109 @@ function updateGateDoors(dt){
 }
 
 // ── SNOW ──────────────────────────────────────────────────────────────────────
-function buildSnow(){ /* removed — dirt track, no snow */ }
+// ── CHRISTMAS INFIELD + FALLING SNOW ──────────────────────────
+let snowPts=null;
+const SNOW_N=420, SNOW_BOX={x:240, y:110, z:240};
+const snowFlakes=[];
+function buildSnow(){
+  const ri=TR-TW/2-6;   // stay well inside the inner rail
+  // Helper — random point on the infield stadium shape (rect + two turn circles)
+  function infieldSpot(){
+    const r=Math.random();
+    if(r<0.6){ return {x:(Math.random()*2-1)*(ri-6), z:8+Math.random()*(STR-16)}; }
+    const ang=Math.random()*Math.PI*2, rad=Math.random()*(ri-8);
+    const cz=(r<0.8)?0:STR;
+    return {x:Math.cos(ang)*rad, z:cz+Math.sin(ang)*rad};
+  }
+  const trunkM=new THREE.MeshStandardMaterial({color:0x5a3a1a,roughness:.9});
+  const pineM =new THREE.MeshStandardMaterial({color:0x1d5c2a,roughness:.85});
+  const pineM2=new THREE.MeshStandardMaterial({color:0x2a7a38,roughness:.85});
+  const snowM =new THREE.MeshStandardMaterial({color:0xf4f8ff,roughness:.6});
+  // ── Christmas trees ──
+  for(let i=0;i<16;i++){
+    const s=infieldSpot();
+    const h=7+Math.random()*7;          // 7–14m tall
+    const t=new THREE.Group();
+    const trunk=new THREE.Mesh(new THREE.CylinderGeometry(h*.05,h*.07,h*.22,8),trunkM);
+    trunk.position.y=h*.11; t.add(trunk);
+    const pm=(i%2)?pineM:pineM2;
+    // three stacked cones
+    [[.5,.20,.42],[.38,.42,.34],[.27,.62,.30]].forEach(c=>{
+      const cone=new THREE.Mesh(new THREE.ConeGeometry(h*c[0],h*c[2],9),pm);
+      cone.position.y=h*c[1]+h*c[2]/2; t.add(cone);
+    });
+    // snowy tip
+    const tip=new THREE.Mesh(new THREE.ConeGeometry(h*.14,h*.14,9),snowM);
+    tip.position.y=h*.88; t.add(tip);
+    // snow ring at the base
+    const ring=new THREE.Mesh(new THREE.CylinderGeometry(h*.42,h*.42,0.05,12),snowM);
+    ring.position.y=0.045; t.add(ring);
+    t.position.set(s.x,0.02,s.z);
+    t.rotation.y=Math.random()*Math.PI*2;
+    scene.add(t);
+  }
+  // ── snow patches on the grass ──
+  for(let i=0;i<12;i++){
+    const s=infieldSpot();
+    const rad=5+Math.random()*13;
+    const patch=new THREE.Mesh(new THREE.CylinderGeometry(rad,rad,0.04,18),snowM);
+    patch.scale.x=0.6+Math.random()*0.8;   // squash into irregular ovals
+    patch.rotation.y=Math.random()*Math.PI;
+    patch.position.set(s.x,0.045,s.z);
+    scene.add(patch);
+  }
+  // ── falling snow ── soft round flakes in a camera-following volume
+  const geo=new THREE.BufferGeometry();
+  const pos=new Float32Array(SNOW_N*3);
+  for(let i=0;i<SNOW_N;i++){
+    const f={
+      x:(Math.random()-0.5)*SNOW_BOX.x,
+      y:Math.random()*SNOW_BOX.y,
+      z:(Math.random()-0.5)*SNOW_BOX.z,
+      vy:-(1.6+Math.random()*2.6),
+      ph:Math.random()*Math.PI*2,
+      sw:0.4+Math.random()*1.0
+    };
+    snowFlakes.push(f);
+    pos[i*3]=f.x; pos[i*3+1]=f.y; pos[i*3+2]=f.z;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  const cv=document.createElement('canvas'); cv.width=cv.height=32;
+  const c2=cv.getContext('2d');
+  const grad=c2.createRadialGradient(16,16,0,16,16,16);
+  grad.addColorStop(0,'rgba(255,255,255,1)');
+  grad.addColorStop(0.5,'rgba(255,255,255,.85)');
+  grad.addColorStop(1,'rgba(255,255,255,0)');
+  c2.fillStyle=grad; c2.fillRect(0,0,32,32);
+  const mat=new THREE.PointsMaterial({size:0.9,map:new THREE.CanvasTexture(cv),
+    color:0xffffff,transparent:true,opacity:.9,depthWrite:false,sizeAttenuation:true});
+  snowPts=new THREE.Points(geo,mat);
+  snowPts.frustumCulled=false;
+  snowPts.visible=false;
+  scene.add(snowPts);
+}
+let snowTime=0;
+function updateSnow(dt){
+  if(!snowPts) return;
+  const show = preRace || racing || replayActive || winnerCamActive;
+  snowPts.visible=show;
+  if(!show) return;
+  snowTime+=dt;
+  const pos=snowPts.geometry.attributes.position.array;
+  const cx=camera.position.x, cz=camera.position.z;
+  for(let i=0;i<SNOW_N;i++){
+    const f=snowFlakes[i];
+    f.y+=f.vy*dt;
+    f.x+=Math.sin(snowTime*f.sw+f.ph)*0.6*dt;
+    if(f.y<0) f.y+=SNOW_BOX.y;
+    // wrap the volume around the camera so snow is everywhere the camera looks
+    let wx=f.x-cx, wz=f.z-cz;
+    wx=((wx%SNOW_BOX.x)+SNOW_BOX.x*1.5)%SNOW_BOX.x - SNOW_BOX.x/2;
+    wz=((wz%SNOW_BOX.z)+SNOW_BOX.z*1.5)%SNOW_BOX.z - SNOW_BOX.z/2;
+    pos[i*3]=cx+wx; pos[i*3+1]=f.y; pos[i*3+2]=cz+wz;
+  }
+  snowPts.geometry.attributes.position.needsUpdate=true;
+}
 
 // ── ELF JOCKEY ────────────────────────────────────────────────────────────────
 function makeElf(coatColor){
@@ -1887,7 +1989,7 @@ function showResults(){
   if(rb) rb.addEventListener('click', startReplay);
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.4</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.5</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
@@ -1984,6 +2086,7 @@ function animate(){
   pauseBtn.style.display = racing ? 'block' : 'none';
   speedBtn.style.display = racing ? 'block' : 'none';
   updateSparkles(rawDt);
+  updateSnow(rawDt);
   if(replayActive){ updateReplay(rawDt); renderer.render(scene, camera); return; }
   if(paused && racing){ renderer.render(scene, camera); return; }
   if(racing) updateRace(dt);
