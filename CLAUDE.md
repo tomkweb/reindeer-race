@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v7.9 (version string appears in exactly 4 places —
+- **Current version:** v8.6.0 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -86,7 +86,11 @@ main script block with node vm before every delivery.
 - Real-phone verification of v7.9 drama pacing and camera framing
 - Closer win-rate knob: `dramaCloserWins = Math.random() < 0.80`
 - Better deer model (Rifat3D, Sketchfab, needs PC purchase)
-- Sound: crowd, hoofbeats, Grinch sting
+- Sound: hoofbeats, Grinch sting still to do. Crowd noise exists (v8.6.0):
+  synthesized babble in Web Audio (`crowdBuffer`/`crowdUpdate`), no asset
+  files; prebuilt at load, resumed on the Race tap; loudness follows race
+  phase, `crowdRoar()` adds swells; ducks under the announcer; 🔊 button
+  mutes both
 
 ## Related project
 **Derby Day betting app** — `tomkweb/derbyDay2026`, live at
