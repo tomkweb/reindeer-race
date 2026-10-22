@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.12.0 (version string appears in exactly 4 places —
+- **Current version:** v8.13.0 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -63,9 +63,11 @@ transcribed; audio + frames measured locally, nothing from it committed):
   function so the text describes the race when it's actually spoken.
   Landmarks fire at the REAL track boundaries (`SEG` from S1..S3: first turn
   ~20%, backstretch ~42%, far turn ~60%, homestretch ~82%) — the old round
-  numbers called "backstretch" mid first turn. Lead changes are called all race
-  (held ≥0.6s, spaced 2.5s / 1.2s in the stretch, owed until called) and name
-  who was passed. Short lines only (≤3 names). A pre-race line on the Race tap
+  numbers called "backstretch" mid first turn. Lead changes (v8.13.0, Tom
+  found every-change calls too many): before the turn for home only a change
+  held 2.5s gets its own call, ≤1 per 12s (~1.5/race; roll calls name the
+  leader anyway); in the stretch every change held 0.6s, spaced 1.2s
+  (~4/race). Calls name who was passed. Short lines only (≤3 names). A pre-race line on the Race tap
   warms up the TTS engine so "And they're off!" lands on the break.
   Verify with the Node harness pattern: extract `const ann={` … `// ── CROWD
   NOISE` into a vm with mocked speechSynthesis (duration ≈ words/3s + 0.35s)
@@ -91,6 +93,10 @@ wire cam with surge-adaptive zoom (blends aim toward the charging closer)
   leader AND the next two. `fitTop3Fov()` widens (never narrows) the FOV of
   every mode in `FIT_TOP3` until the top 3 (+ landed Grinch) fit in the
   current aspect
+- Run to the line (grandstand, raceFrac>0.88, v8.13.0): side-on from the
+  outside rail framing lead room ahead of the leader back to 3rd place, so
+  the leader is on the RIGHT (travel is left→right) with chasers trailing;
+  camera distance set from that span at a fixed 40° FOV
 - Photo finish: camera ON the finish-line axis at the outside rail, deer
   snapped so nose touches the line, forced portrait 480×854 render,
   fenceGroup + finishPoles hidden during the one-frame capture

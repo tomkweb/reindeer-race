@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v8.12.0</title>
+<title>Reindeer Dash v8.13.0</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -109,7 +109,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.12.0</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.13.0</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -160,7 +160,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v8.12.0';
+const VERSION='v8.13.0';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -348,8 +348,9 @@ function announcerUpdate(){
   const ord=topN(9);
   const gapL=(a,b)=>(a.progress-b.progress)*CIRC/2.5;   // a length ≈ 2.5m
   const li=deerObjs.indexOf(ld);
-  // Any line that names the current leader counts as calling the lead
-  const named=()=>{ ann.calledLeadIdx=li; ann.lastLeadT=raceTime; };
+  // Any line that names the current leader counts as covering the lead;
+  // only an explicit "takes the lead" call restarts the lead-call spacing
+  const named=()=>{ ann.calledLeadIdx=li; };
   // Excitement escalates with the race — pitch climbs as they get closer to home
   const exR=1.02+frac*0.42, exP=1.0+frac*0.3;
   const L3={pri:3,rate:exR,pitch:exP};
@@ -380,23 +381,25 @@ function announcerUpdate(){
         `${dramaCloser.name} has found another gear!`,
         `Out of nowhere, ${dramaCloser.name} is charging!`]),{pri:3,rate:1.42,pitch:1.32}); }
   }
-  // ── lead changes, all race long. The new leader must hold it ~0.6s so a
-  // nose-bob doesn't trigger a call; calls are spaced (closer together late).
-  // A change that can't be called yet stays owed and is called as soon as the
-  // caller is free — it's never silently dropped.
+  // ── lead changes. Until the turn for home the lead swaps constantly, so only
+  // a change that STICKS (held 2.5s) gets its own call, at most every 12s —
+  // the running roll calls name the leader in between anyway. From the turn
+  // for home every change is called (held 0.6s, spaced 1.2s).
+  const stretch=frac>SEG.home;
   if(li!==ann.lastLeadIdx){ ann.lastLeadIdx=li; ann.leadSince=raceTime; }
-  else if(li!==ann.calledLeadIdx && raceTime-ann.leadSince>0.6
-          && raceTime-ann.lastLeadT>(frac>SEG.home?1.2:2.5) && frac>0.04){
+  const leadCallDue = li===ann.lastLeadIdx && li!==ann.calledLeadIdx && frac>0.04
+    && raceTime-ann.leadSince>(stretch?0.6:2.5) && raceTime-ann.lastLeadT>(stretch?1.2:12);
+  if(leadCallDue){
     if(ann.calledLeadIdx<0) named();   // first leader of the race — the break call covers it
     else { const was=deerObjs[ann.calledLeadIdx].name;
       if(say(pick([`${ld.name} takes the lead!`, `Now it's ${ld.name} in front!`,
       `${ld.name} goes past ${was}!`, `${ld.name} hits the front!`, `${was} is headed, ${ld.name} leads!`,
       `${ld.name} edges ahead of ${was}!`]),
-      {pri:2,rate:exR,pitch:exP,valid:()=>leader()===ld})) named(); }
+      {pri:2,rate:exR,pitch:exP,valid:()=>leader()===ld})){ named(); ann.lastLeadT=raceTime; } }
   }
   // ── running colour: short roll calls, only when the caller is free ──
-  // (held back while a lead change is owed, so the change gets the floor first)
-  if(frac>0.05 && frac<SEG.home && raceTime-ann.lastCall>3 && li===ann.calledLeadIdx){
+  // (held back only while a lead-change call is due, so it gets the floor first)
+  if(frac>0.05 && frac<SEG.home && raceTime-ann.lastCall>3 && !leadCallDue){
     if(!(window.speechSynthesis && speechSynthesis.speaking) && !ann.pending){
       ann.lastCall=raceTime;
       const g=lengthsTxt(gapL(ord[0],ord[1]));
@@ -2010,10 +2013,29 @@ function directCamera(dt){
     if(finalRun && grinchRace && grinch && grinch.group.visible && grinch.speed>0.5){
       cx=grinch.group.position.x; cz=grinch.group.position.z;
     }
-    const dist = finalRun ? 8 + lf.spread*0.6 : 6 + lf.spread*0.8;
-    tp.set(cx + (TW/2 + dist), finalRun ? 2.4+lf.spread*0.1 : 3+lf.spread*0.15, cz);
-    ta.set(cx, 2, cz);
-    if(finalRun) targetFov=44;
+    if(finalRun){
+      // RUN TO THE LINE — side-on from the outside rail. They run left→right
+      // across the screen, so frame from a little lead room ahead of the
+      // leader back to the 3rd-placed runner: the leader sits on the RIGHT
+      // with the chasers trailing behind on the left.
+      const lead = (grinchRace && grinch && grinch.group.visible && grinch.landed && !grinch.finished) ? grinch : ld;
+      const third = topN(3)[Math.min(2, topN(3).length-1)];
+      const lp = lead.finished ? lead.progress : lead.progress + (lead.speed||0)*0.55/CIRC;  // same lag lead as leadersFrame
+      const tpP = third.finished ? third.progress : third.progress + (third.speed||0)*0.55/CIRC;
+      const front = lp + 5/CIRC, back = Math.min(tpP, lp) - 3/CIRC;   // lead room / trailing margin
+      const span = Math.max(10, (front-back)*CIRC);
+      const fovF = 40, hHalf = Math.atan(Math.tan(fovF*Math.PI/360)*(camera.aspect||0.56));
+      const dist = Math.max(10, Math.min(70, (span/2)/Math.tan(hHalf)*1.05));
+      const mid = (front+back)/2;
+      const c = trackPos(mid, 0), cam = trackPos(mid, TW/2 + dist);
+      tp.set(cam.x, 2.6 + dist*0.04, cam.z);
+      ta.set(c.x, 1.6, c.z);
+      targetFov=fovF;
+    } else {
+      const dist = 6 + lf.spread*0.8;
+      tp.set(cx + (TW/2 + dist), 3+lf.spread*0.15, cz);
+      ta.set(cx, 2, cz);
+    }
     camLabel.innerHTML='<span class="rec">●</span> GRANDSTAND'; sm=finalRun?4.0:2.5;
 
   } else if(mode==='gate_crane'){
@@ -2195,7 +2217,7 @@ function showResults(){
   if(rb) rb.addEventListener('click', startReplay);
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.12.0</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.13.0</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
