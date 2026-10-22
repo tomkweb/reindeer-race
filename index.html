@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v8.7.0</title>
+<title>Reindeer Dash v8.8.0</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -109,7 +109,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.7.0</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.8.0</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -160,7 +160,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v8.7.0';
+const VERSION='v8.8.0';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -249,18 +249,24 @@ let paused=false;
 let speedMult=1;
 // ── RACE ANNOUNCER (Web Speech API — no audio assets needed) ──
 const ann={on:true, lastCall:0, lastLeadIdx:-1, lastLeadT:-10, flags:{}, voice:null};
-// The default system voice is usually the flattest one installed. Hunt for a
-// livelier one — Google's US English (Android/Chrome) reads with real intonation.
+// A British male race caller — the classic Ascot/York sound. Voice names differ
+// per platform, so walk a preference list: Chrome desktop, Edge/Windows natural
+// voices, Apple, then Android Google TTS (gender isn't exposed there — rjs/gbd
+// are the male en-GB variants). Falls back to any en-GB, then any English.
+const GB_MALE=[/Google UK English Male/i, /Microsoft (Ryan|Thomas|Alfie|Elliot|Oliver|Ethan|Noah).*United Kingdom/i,
+  /Microsoft George/i, /^(Daniel|Arthur|Oliver)\b/i, /en-gb-x-(rjs|gbd)/i];
 function pickVoice(){
   try{
     if(!window.speechSynthesis) return;
     const vs=speechSynthesis.getVoices();
     if(!vs.length) return;
-    ann.voice =
-      vs.find(v=>/Google US English/i.test(v.name)) ||
-      vs.find(v=>/en[-_]US/i.test(v.lang) && /Google/i.test(v.name)) ||
-      vs.find(v=>/en[-_]US/i.test(v.lang) && /natural|neural|online/i.test(v.name)) ||
-      vs.find(v=>/en[-_]US/i.test(v.lang)) ||
+    const gb=vs.filter(v=>/en[-_]GB/i.test(v.lang));
+    let best=null;
+    const hit=re=>v=>re.test(v.name)||re.test(v.voiceURI||'');
+    for(const re of GB_MALE){ best=gb.find(hit(re)) || vs.find(hit(re)); if(best) break; }
+    ann.voice = best ||
+      gb.find(v=>/male/i.test(v.name) && !/female/i.test(v.name)) ||
+      gb.find(v=>/natural|neural|online|Google/i.test(v.name)) || gb[0] ||
       vs.find(v=>/^en/i.test(v.lang)) || null;
   }catch(e){}
 }
@@ -275,8 +281,14 @@ function say(txt, opts={}){
     if(opts.force) speechSynthesis.cancel();
     else if(speechSynthesis.speaking) return;
     const u=new SpeechSynthesisUtterance(txt);
-    if(ann.voice) u.voice=ann.voice;
-    u.rate=opts.rate||1.15; u.pitch=opts.pitch||1.05; u.volume=1;
+    if(ann.voice){ u.voice=ann.voice; u.lang=ann.voice.lang; } else u.lang='en-GB';
+    // Real callers hold ~3 words/s all race and do NOT speed up at the finish —
+    // excitement shows as pitch and volume. So call-site "rate" barely moves the
+    // speed, and "pitch" is stretched: a low, even baritone early, climbing
+    // toward an octave-ish shout at the wire.
+    const r=opts.rate||1.15, p=opts.pitch||1.05;
+    u.rate=1.05+Math.min(0.08,Math.max(0,(r-1.1)*0.25));
+    u.pitch=Math.min(1.6, 0.9+Math.max(0,p-1)*1.6); u.volume=1;
     speechSynthesis.speak(u);
   }catch(e){}
 }
@@ -287,7 +299,7 @@ function announcerUpdate(){
   const frac=(ld.progress-P_GATE)/1.25;
   const F=ann.flags;
   // Excitement escalates with the race — faster and higher as they get closer to home
-  const exR=1.02+frac*0.42, exP=0.98+frac*0.36;
+  const exR=1.02+frac*0.42, exP=1.0+frac*0.3;
   // ── landmark calls, varied phrasing ──
   if(!F.q1 && frac>=0.15){ F.q1=true;
     say(pick([`${ld.name} breaks on top as they head into the first turn!`,
@@ -300,6 +312,9 @@ function announcerUpdate(){
     const t2=topN(2);
     say(pick([`Halfway home! ${t2[0].name} and ${t2[1].name} are putting on a show!`,
       `At the half, it's ${t2[0].name}! But this pack is TIGHT!`]),{rate:exR,pitch:exP}); }
+  if(!F.mile && frac>=0.60){ F.mile=true;
+    say(pick([`Half a mile to run, and ${ld.name} still holds the call!`,
+      `Four furlongs left. ${ld.name} in front, and the pack are closing up!`]),{rate:exR,pitch:exP}); }
   if(!F.far && frac>=0.68){ F.far=true;
     say(pick(['Around the final turn — here they come!',
       'They lean into the final turn! Hold onto your hats!',
@@ -308,9 +323,11 @@ function announcerUpdate(){
     const t2=topN(2);
     say(pick([`DOWN THE STRETCH THEY COME! It's ${t2[0].name} and ${t2[1]?t2[1].name:''}!`,
       `They turn for home! ${t2[0].name} digs in — ${t2[1]?t2[1].name:''} won't go away!`]),{force:true,rate:1.42,pitch:1.32}); }
+  if(!F.furlong && frac>=0.90){ F.furlong=true;
+    say(pick(['A furlong to go!','One furlong left!']),{force:true,rate:1.3,pitch:1.3}); }
   if(!F.duel && frac>=0.93){ F.duel=true;
     const t2=topN(2);
-    if(t2.length>1) say(`It's ${t2[0].name}! It's ${t2[1].name}! Side by side! To the wire!`,{force:true,rate:1.45,pitch:1.35}); }
+    if(t2.length>1) say(`Inside the final furlong! ${t2[0].name}! ${t2[1].name}! Nothing between them!`,{force:true,rate:1.45,pitch:1.38}); }
   if(!F.closer && dramaCloser && !dramaCloser.finished && frac>=0.83){ F.closer=true; crowdRoar('surge',0.7);
     say(pick([`WAIT — here comes ${dramaCloser.name}, FLYING on the outside!`,
       `${dramaCloser.name} has found another gear! What a run!`,
@@ -327,18 +344,23 @@ function announcerUpdate(){
     }
     ann.lastLeadIdx=li;
   }
-  // ── periodic colour calls with gap description (a length ≈ 2.5m) ──
-  if(frac>0.08 && frac<0.66 && raceTime-ann.lastCall>7){
+  // ── running commentary (a length ≈ 2.5m). Real callers barely draw breath,
+  // so call every ~4s; say() skips the line if the last one is still going.
+  // Mostly running-order roll calls, the way the field gets read out on TV.
+  if(frac>0.08 && frac<0.66 && raceTime-ann.lastCall>4){
     ann.lastCall=raceTime;
-    const t2=topN(2);
-    if(t2.length>1){
-      const gapM=(t2[0].progress-t2[1].progress)*CIRC;
-      const gapTxt = gapM<1.5 ? pick(['nose to nose','neck and neck','locked together'])
-        : gapM<4 ? 'by a length'
-        : `by ${Math.round(gapM/2.5)} lengths`;
-      say(pick([`${t2[0].name} leads ${t2[1].name}, ${gapTxt}!`,
-        `It's ${t2[0].name} and ${t2[1].name}, ${gapTxt}!`,
-        `${t2[0].name} out front ${gapTxt}, ${t2[1].name} stalking!`]),{rate:exR,pitch:exP});
+    const t4=topN(4);
+    if(t4.length>3){
+      const gapM=(t4[0].progress-t4[1].progress)*CIRC;
+      const L=gapM/2.5;
+      const gapTxt = L<0.3 ? pick(['a neck','a head']) : L<0.75 ? 'half a length'
+        : L<1.25 ? 'a length' : L<1.75 ? 'a length and a half'
+        : `${Math.round(L)} lengths`;
+      say(pick([
+        `${t4[0].name} leads by ${gapTxt} from ${t4[1].name}. ${t4[2].name} is third, then ${t4[3].name}.`,
+        `${t4[0].name} in front by ${gapTxt}. ${t4[1].name} second, ${t4[2].name} third, ${t4[3].name} on the outside.`,
+        `It's ${t4[0].name}, ${gapTxt} to ${t4[1].name}, then comes ${t4[2].name}, and ${t4[3].name} tracking them.`,
+        `${t4[0].name} still the leader. ${t4[1].name} poised in second, ${gapTxt} away.`]),{rate:exR,pitch:exP});
     }
   }
   // ── winner + placings ──
@@ -405,7 +427,10 @@ function crowdUpdate(dt){
   else if(racing){
     const ld=leader();
     const frac=ld?Math.max(0,Math.min(1,(ld.progress-P_GATE)/1.25)):0;
-    tgt = finishCounter>0 ? 0.6 : 0.25+0.45*frac*frac;
+    // Broadcast audio sits fairly level for most of the race and builds
+    // ~6-8 dB from the final turn, peaking right at the line
+    const b=Math.max(0,Math.min(1,(frac-0.62)/0.33));
+    tgt = finishCounter>0 ? 0.6 : 0.28+0.47*b*b*(3-2*b);
   } else tgt=0.12;   // results / title screen
   crowd.level += (tgt-crowd.level)*Math.min(1, dt*(tgt>crowd.level?2.0:0.6));
   const t=crowd.ctx.currentTime, L=crowd.level;
@@ -2052,7 +2077,7 @@ function showResults(){
   if(rb) rb.addEventListener('click', startReplay);
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.7.0</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.8.0</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;

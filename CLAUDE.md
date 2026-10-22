@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.7.0 (version string appears in exactly 4 places —
+- **Current version:** v8.8.0 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -42,6 +42,23 @@ commit. Pages redeploys in 2–5 min. Other repo files: `scene.gltf`
   betting app's unclaimed-pool refund
 - No-fly zone: no new leaps after 72% race distance — hooves down for
   the drive
+
+## Announcer (Web Speech API) — modelled on real broadcasts
+Tuned (v8.8.0) from an analysis of WHR's "12 Best Races of 2025" (11 race calls
+transcribed; audio + frames measured locally, nothing from it committed):
+- **Voice:** British male (the Ascot/York/Leopardstown sound). `GB_MALE`
+  preference list: Google UK English Male → Edge "Ryan/Thomas… (United
+  Kingdom)" natural voices → Apple Daniel/Arthur → Android `en-gb-x-rjs|gbd`.
+  Android Chrome exposes only one "English United Kingdom" voice; its gender
+  is whatever the phone's Google TTS en-GB voice is set to (system setting).
+- **Pacing:** real callers hold ~3 words/s the whole race and do *not* speed up
+  at the finish. Excitement is pitch (calm F0 ~120-135 Hz → ~230-265 Hz at the
+  wire, nearly an octave) and volume. `say()` therefore keeps rate ~1.05-1.13
+  and maps call-site pitch onto 0.9-1.6.
+- **Content:** near-continuous running-order roll calls (top 4 + gap in
+  lengths: neck / half a length / a length and a half…) every ~4s, plus
+  furlong markers (half a mile, a furlong to go, inside the final furlong).
+  The race is 1.25 "miles" = 10 furlongs.
 
 ## Camera system (broadcast structure)
 gate head-on (2s hold) → wire cam first pass (frames whole pack, real lens
@@ -85,6 +102,12 @@ main script block with node vm before every delivery.
 
 ## Open items
 - Real-phone verification of v7.9 drama pacing and camera framing
+- Camera ideas from the broadcast analysis (not yet done): real coverage
+  uses far fewer cuts — one long telephoto side-on pan carries most of the
+  backstretch (Belmont: ~60s unbroken), head-on telephoto into turns, 7-14s
+  typical shots; our 4-6s backstretch cuts are busier than TV. Also: a
+  running-order strip of silk colours + mini track map with distance-to-go
+  (Japan Cup graphics), and a name/number lower-third at the gate
 - Closer win-rate knob: `dramaCloserWins = Math.random() < 0.80`
 - Better deer model (Rifat3D, Sketchfab, needs PC purchase)
 - Sound: hoofbeats, Grinch sting still to do. Crowd noise (v8.7.0) uses
