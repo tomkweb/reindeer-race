@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v8.14.0</title>
+<title>Reindeer Dash v8.15.0</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -109,7 +109,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.14.0</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.15.0</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -160,7 +160,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v8.14.0';
+const VERSION='v8.15.0';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -1702,8 +1702,8 @@ function fitFov(from, at, positions, margin=1.2){
   let tx=0, ty=0;
   const v=new THREE.Vector3();
   for(const p of positions){
-    for(const dy of [0,5.5]){                      // hooves … name tag
-      v.set(p.x-from.x, p.y+dy-from.y, p.z-from.z);
+    for(const dy of [0,5.5]){                      // hooves … name tag (ground-based, so leaps don't pump the zoom)
+      v.set(p.x-from.x, dy-from.y, p.z-from.z);
       const z=v.dot(f); if(z<2) continue;          // behind/too close to the lens: skip
       tx=Math.max(tx, (Math.abs(v.dot(r))+2.6)/z); // body length + antlers either side
       ty=Math.max(ty, (Math.abs(v.dot(u))+0.8)/z);
@@ -1728,6 +1728,40 @@ function packPositions(){
   const top3=topN(3);
   return deerObjs.filter(d=>d && (top3.includes(d) || (!d.finished && (ld.progress-d.progress)*CIRC<reach)))
     .map(d=>d.group.position);
+}
+// STEADY GROUP TRACKER for the tight long-lens shots. Everything that made the
+// telephoto jitter is smoothed here:
+//  • membership is SOFT — weight fades over 12m around `reach` behind the
+//    leader, so a runner drifting in/out of the bunch slides the frame instead
+//    of popping it (and a lead change moves nothing: it's distance from the front)
+//  • the centre is the weighted mean PROGRESS + lane, mapped onto the track,
+//    so it glides along the rail instead of averaging bobbing deer positions
+//  • lag compensation uses the SMOOTHED pack speed (1s low-pass), not each
+//    runner's surging speed; leadT matches the camera's own follow lag (1/sm)
+let packSpeed=14;
+function steadyGroup(reach, leadT, extra){
+  const ld=leader(); if(!ld) return null;
+  let W=0, P=0, Ln=0; const pts=[];
+  deerObjs.forEach(d=>{ if(!d) return;
+    const behind=(ld.progress-d.progress)*CIRC;
+    const w=Math.max(0, Math.min(1, (reach+6-behind)/12));
+    if(w<=0) return;
+    W+=w; P+=w*d.progress; Ln+=w*(d.curLane!==undefined?d.curLane:d.laneOff);
+    if(w>0.35) pts.push(d.group.position);
+  });
+  if(extra && !extra.finished){                     // e.g. the charging closer
+    W+=1; P+=extra.progress; Ln+=(extra.curLane!==undefined?extra.curLane:extra.laneOff);
+    pts.push(extra.group.position);
+  }
+  if(!W) return null;
+  const p=P/W + packSpeed*leadT/CIRC;
+  const c=trackPos(p, Ln/W);
+  return {x:c.x, z:c.z, p, pts};
+}
+function updatePackSpeed(dt){
+  let n=0, v=0;
+  deerObjs.forEach(d=>{ if(d && !d.finished){ n++; v+=d.speed||0; } });
+  if(n) packSpeed += (v/n - packSpeed)*Math.min(1, dt*1.0);
 }
 function leadersFrame(){
   const t=topN(3);
@@ -1918,8 +1952,12 @@ function updateRace(dt){
 // ── CAMERA DIRECTOR ───────────────────────────────────────────────────────────
 function directCamera(dt){
   // Smooth FOV transitions
-  currentFov += (targetFov - currentFov) * Math.min(1, dt * 3);
-  if(Math.abs(currentFov - camera.fov) > 0.05){
+  // Zoom OUT promptly (someone's leaving the frame), zoom IN gently — no pumping
+  currentFov += (targetFov - currentFov) * Math.min(1, dt * (targetFov>currentFov ? 2.2 : 0.7));
+  updatePackSpeed(dt);
+  // Relative threshold: a fixed 0.05° step is invisible at 50° but a 1-2%
+  // zoom "staircase" on a 3° telephoto — which read as zoom jitter
+  if(Math.abs(currentFov - camera.fov) > currentFov*0.0002){
     camera.fov = currentFov; camera.updateProjectionMatrix();
   }
 
@@ -2089,13 +2127,19 @@ function directCamera(dt){
     return;
 
   } else if(mode==='telephoto'){
-    // Long lens on the leaders — compression effect
-    const lf=leadersFrame();
-    tp.set(lf.x + TR + TW + 45, 5, lf.z);
-    ta.set(lf.x, 2, lf.z);
-    camLabel.innerHTML='<span class="rec">●</span> TELEPHOTO';
-    targetFov=fitFov(tp, ta, packPositions(), 1.15);   // long lens filled with the bunch
+    // Long lens on the bunch — compression effect, on the steady tracker
     sm = raceFrac>0.6 ? 3.0 : 1.8;
+    const g=steadyGroup((camera.aspect||1)<1 ? 12 : 30, 1/sm);
+    if(g){
+      // Camera rides OUTSIDE the track, 150m off the rail, shooting inward: the
+      // old spot sat in the infield, so the (7-14m) infield trees blocked the
+      // now-tight lens; from outside they're backdrop behind the field
+      const cp=trackPos(g.p, TW/2 + 150);
+      tp.set(cp.x, 6, cp.z);
+      ta.set(g.x, 2, g.z);
+      targetFov=fitFov(tp, ta, g.pts, 1.2);          // long lens filled with the bunch
+    }
+    camLabel.innerHTML='<span class="rec">●</span> TELEPHOTO';
 
   } else if(mode==='headon_low'){
     // Ground level facing oncoming leaders
@@ -2130,41 +2174,17 @@ function directCamera(dt){
     // high camera near the finish, FIXED position, PANS with the pack.
     const hc=trackPos(-8/CIRC, TW/2+30);  // just past the line, high outside
     tp.set(hc.x, 26, hc.z);               // constant position — pan only
-    const lf=leadersFrame();
-    let ax=lf.x, az=lf.z, sprd=lf.spread;
     const earlyPass = raceFrac < 0.5;     // first trip down the stretch
-    if(earlyPass){
-      // Frame the WHOLE pack — aim at pack centre, radius covers every runner
-      const pk=packXZ();
-      ax=pk.x; az=pk.z;
-      let r=4;
-      deerObjs.forEach(d=>{ if(d && !d.finished){
-        r=Math.max(r, Math.hypot(d.group.position.x-ax, d.group.position.z-az));
-      }});
-      sprd=r*2;
-    } else if(dramaCloser && !dramaCloser.finished){
-      // DRAMA: blend the aim toward the charging closer and widen the frame
-      // so the come-from-behind run is always on screen.
-      const cf=(dramaCloser.progress-P_GATE)/1.25;
-      if(cf>0.78){
-        const cp=dramaCloser.group.position;
-        ax = ax*0.68 + cp.x*0.32;
-        az = az*0.68 + cp.z*0.32;
-        const ld0=leader();
-        if(ld0) sprd = Math.max(sprd, Math.hypot(ld0.group.position.x-cp.x, ld0.group.position.z-cp.z)*1.1);
-      }
+    // Early pass frames the bunch; the late pass the leading group plus the
+    // charging closer (so the come-from-behind run is always on screen).
+    // Both on the steady tracker; lead time matches this shot's sm=5 follow.
+    const cl = (!earlyPass && dramaCloser && !dramaCloser.finished
+                && (dramaCloser.progress-P_GATE)/1.25>0.78) ? dramaCloser : null;
+    const g = steadyGroup(earlyPass ? ((camera.aspect||1)<1 ? 12 : 30) : 8, 1/5.0, cl);
+    if(g){
+      ta.set(g.x, 1.5, g.z);
+      targetFov=fitFov(tp, ta, g.pts, 1.2);
     }
-    ta.set(ax, 1.5, az);
-    // REAL LENS OPTICS: FOV that exactly fits the subject at its distance —
-    // long-lens tight when they're far up the stretch, widening automatically
-    // as they bear down on the camera so nobody leaves the frame.
-    const dx=ax-tp.x, dz=az-tp.z;
-    const dist=Math.max(8, Math.hypot(dx,dz));
-    // Early pass frames the bunch; the late pass the leaders plus the charging closer
-    const subj = earlyPass ? packPositions() : topN(3).map(d=>d.group.position);
-    if(!earlyPass && dramaCloser && !dramaCloser.finished && (dramaCloser.progress-P_GATE)/1.25>0.78)
-      subj.push(dramaCloser.group.position);
-    targetFov=fitFov(tp, ta, subj, 1.15);
     camLabel.innerHTML='<span class="rec">●</span> HOMESTRETCH'; sm=5.0;
 
   } else if(mode==='infield'){
@@ -2236,7 +2256,7 @@ function showResults(){
   if(rb) rb.addEventListener('click', startReplay);
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.14.0</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.15.0</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;

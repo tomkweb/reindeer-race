@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.14.0 (version string appears in exactly 4 places —
+- **Current version:** v8.15.0 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -98,6 +98,16 @@ wire cam with surge-adaptive zoom (blends aim toward the charging closer)
   `packPositions()` — the old wire formula ignored aspect and had a 14° floor,
   so a 300m+ shot on a landscape PC/TV showed a speck. Landscape frames
   everyone within 30m of the leader; portrait the leading group (12m, ≥ top 3)
+- Steadiness (v8.15.0, Tom saw jitter in the tight shots): `steadyGroup()`
+  feeds wire + telephoto — soft 12m membership fade, centre = weighted mean
+  progress/lane mapped onto the track (lead changes don't move it), lag lead
+  from 1s-smoothed `packSpeed` × 1/sm. Fit is on the ground plane (leaps don't
+  pump the zoom); zoom out fast/in slow; camera.fov updates on a RELATIVE
+  threshold (the old fixed 0.05° made a 1-2% zoom staircase at 3°). Measured
+  with a headless harness driving animate() by hand at fixed 1/60 (headless
+  rAF barely ticks): telephoto zoom jitter 46→2.8, aim 0.17→0.04; wire zoom
+  70→1.7. Telephoto camera now rides OUTSIDE the track (150m off the rail) —
+  from its old infield spot the 7-14m infield trees blocked the tight lens
 - Run to the line (grandstand, raceFrac>0.88, v8.13.0): side-on from the
   outside rail framing lead room ahead of the leader back to 3rd place, so
   the leader is on the RIGHT (travel is left→right) with chasers trailing;
