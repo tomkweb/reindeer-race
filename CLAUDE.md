@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.10.0 (version string appears in exactly 4 places —
+- **Current version:** v8.11.0 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -144,6 +144,13 @@ main script block with node vm before every delivery.
   + instant level jump, no announcer duck for 3.5s. Audio URLs carry
   `?v=VERSION` — Pages caches files ~10 min, and a stale clip once made the
   start surge seem ~9s late on Tom's phone.
+  v8.11.0: Tom said it sounded like a rugby match and wants men/women 50/50.
+  `excited` loop is now CC0 Freesound #486215 (men & women egging on);
+  cheer/surge/roar one-shots blend CC0 women's/mixed cheering (#480755,
+  #380398, #380400) with the Quendel male roars at equal RMS. Rejected:
+  #204950 trackside race-meet recording (constant hum + PA caller under it).
+  Pitch-based gender estimates are useless on shouting crowds (male shouts
+  land in the female F0 range) — judge by source description/spectrogram.
   Never rip audio from broadcasts (e.g. NBC Derby on YouTube) — the repo is public
 
 ## Related project
