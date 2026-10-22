@@ -14,13 +14,14 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.6.0 (version string appears in exactly 4 places —
+- **Current version:** v8.7.0 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
 Edit `index.html` on GitHub (web UI works from Android), paste full file,
-commit. Pages redeploys in 2–5 min. Only other repo files are `scene.gltf`
-+ `scene.bin` (deer model, CC-BY-4.0 by DarryleH — keep the credit line).
+commit. Pages redeploys in 2–5 min. Other repo files: `scene.gltf`
++ `scene.bin` (deer model, CC-BY-4.0 by DarryleH) and `audio/crowd_*.mp3`
+(crowd samples, CC-BY-4.0 by Gregor Quendel) — keep both credit lines.
 
 ## Race drama system (the heart of it)
 - Base speeds tightly banded (13.6–14.4) + big sinusoidal surges →
@@ -86,11 +87,15 @@ main script block with node vm before every delivery.
 - Real-phone verification of v7.9 drama pacing and camera framing
 - Closer win-rate knob: `dramaCloserWins = Math.random() < 0.80`
 - Better deer model (Rifat3D, Sketchfab, needs PC purchase)
-- Sound: hoofbeats, Grinch sting still to do. Crowd noise exists (v8.6.0):
-  synthesized babble in Web Audio (`crowdBuffer`/`crowdUpdate`), no asset
-  files; prebuilt at load, resumed on the Race tap; loudness follows race
-  phase, `crowdRoar()` adds swells; ducks under the announcer; 🔊 button
-  mutes both
+- Sound: hoofbeats, Grinch sting still to do. Crowd noise (v8.7.0) uses
+  real recordings in `audio/` — a synthesized noise crowd (v8.6.0) sounded
+  like static and was dropped. Two loops (`bed` ambience, `excited` chatter)
+  crossfade with race phase in `crowdUpdate`; one-shots via
+  `crowdRoar(name,vol)`: cheer at gates, surge for the closer, roar at the
+  wire. Clips were cut from Gregor Quendel's "Free Crowd Cheering Sounds"
+  (opengameart.org) with 3s equal-power loop crossfades; loops skip 50ms at
+  each end for MP3 padding. Ducks under the announcer; 🔊 mutes both.
+  Never rip audio from broadcasts (e.g. NBC Derby on YouTube) — the repo is public
 
 ## Related project
 **Derby Day betting app** — `tomkweb/derbyDay2026`, live at
