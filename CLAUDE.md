@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.9.0 (version string appears in exactly 4 places —
+- **Current version:** v8.9.1 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -122,6 +122,8 @@ main script block with node vm before every delivery.
   announcer (Tom's call): master `CROWD_VOL` 0.35, ducked ×`CROWD_DUCK` 0.4
   while speaking. Silent until the first Race tap (`crowd.started`; context
   suspended at load because Chrome auto-runs AudioContexts on familiar sites).
+  Pre-race it starts soft and swells through the lineup + 3-2-1 countdown,
+  peaking as the gates open (`crowd.preT`).
   Never rip audio from broadcasts (e.g. NBC Derby on YouTube) — the repo is public
 
 ## Related project

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v8.9.0</title>
+<title>Reindeer Dash v8.9.1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -109,7 +109,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.9.0</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.9.1</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -160,7 +160,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v8.9.0';
+const VERSION='v8.9.1';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -381,7 +381,7 @@ function announcerUpdate(){
 // Two looped beds — general ambience and excited chatter — crossfade with the
 // race (murmur at the gate → building through the stretch), and one-shot roars
 // fire at the big moments. Samples: Gregor Quendel, CC-BY-4.0 (credited on results).
-const crowd={ctx:null, out:null, bed:null, excited:null, shots:{}, level:0, started:false};
+const crowd={ctx:null, out:null, bed:null, excited:null, shots:{}, level:0, started:false, preT:0};
 // Overall crowd volume. Kept well under the announcer: speechSynthesis can't be
 // boosted past volume 1, so the crowd has to sit low for the calls to cut through.
 const CROWD_VOL=0.35, CROWD_DUCK=0.4;
@@ -428,7 +428,13 @@ function crowdUpdate(dt){
   let tgt;
   if(paused&&racing) tgt=0.03;
   else if(replayActive) tgt=0.45;
-  else if(preRace) tgt=0.15;
+  else if(preRace){
+    // Anticipation: soft as they load, swelling through the 3-2-1 countdown
+    // (gate lineup PRE_RACE_DUR + ~3s count), peaking as the gates open
+    crowd.preT+=dt;
+    const k=Math.min(1, crowd.preT/(PRE_RACE_DUR+3));
+    tgt=0.08+0.5*k*k;
+  }
   else if(racing){
     const ld=leader();
     const frac=ld?Math.max(0,Math.min(1,(ld.progress-P_GATE)/1.25)):0;
@@ -437,6 +443,7 @@ function crowdUpdate(dt){
     const b=Math.max(0,Math.min(1,(frac-0.62)/0.33));
     tgt = finishCounter>0 ? 0.6 : 0.28+0.47*b*b*(3-2*b);
   } else tgt=0.12;   // results / title screen
+  if(!preRace) crowd.preT=0;
   crowd.level += (tgt-crowd.level)*Math.min(1, dt*(tgt>crowd.level?2.0:0.6));
   const t=crowd.ctx.currentTime, L=crowd.level;
   crowd.bed.gain.setTargetAtTime(0.6*Math.min(1,L*3), t, 0.1);
@@ -2082,7 +2089,7 @@ function showResults(){
   if(rb) rb.addEventListener('click', startReplay);
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.9.0</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.9.1</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
