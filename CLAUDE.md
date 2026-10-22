@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.8.0 (version string appears in exactly 4 places —
+- **Current version:** v8.9.0 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -53,8 +53,9 @@ transcribed; audio + frames measured locally, nothing from it committed):
   is whatever the phone's Google TTS en-GB voice is set to (system setting).
 - **Pacing:** real callers hold ~3 words/s the whole race and do *not* speed up
   at the finish. Excitement is pitch (calm F0 ~120-135 Hz → ~230-265 Hz at the
-  wire, nearly an octave) and volume. `say()` therefore keeps rate ~1.05-1.13
-  and maps call-site pitch onto 0.9-1.6.
+  wire, nearly an octave) and volume. `say()` keeps rate brisk and near-flat
+  (1.15-1.25) and maps call-site pitch onto 1.15-1.9 — Tom wants a high-energy,
+  higher-pitched caller (v8.9.0), not a low baritone.
 - **Content:** near-continuous running-order roll calls (top 4 + gap in
   lengths: neck / half a length / a length and a half…) every ~4s, plus
   furlong markers (half a mile, a furlong to go, inside the final furlong).
@@ -117,7 +118,10 @@ main script block with node vm before every delivery.
   `crowdRoar(name,vol)`: cheer at gates, surge for the closer, roar at the
   wire. Clips were cut from Gregor Quendel's "Free Crowd Cheering Sounds"
   (opengameart.org) with 3s equal-power loop crossfades; loops skip 50ms at
-  each end for MP3 padding. Ducks under the announcer; 🔊 mutes both.
+  each end for MP3 padding. 🔊 mutes both. Crowd must stay clearly UNDER the
+  announcer (Tom's call): master `CROWD_VOL` 0.35, ducked ×`CROWD_DUCK` 0.4
+  while speaking. Silent until the first Race tap (`crowd.started`; context
+  suspended at load because Chrome auto-runs AudioContexts on familiar sites).
   Never rip audio from broadcasts (e.g. NBC Derby on YouTube) — the repo is public
 
 ## Related project
