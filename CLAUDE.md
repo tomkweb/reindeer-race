@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.13.0 (version string appears in exactly 4 places —
+- **Current version:** v8.14.0 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -93,6 +93,11 @@ wire cam with surge-adaptive zoom (blends aim toward the charging closer)
   leader AND the next two. `fitTop3Fov()` widens (never narrows) the FOV of
   every mode in `FIT_TOP3` until the top 3 (+ landed Grinch) fit in the
   current aspect
+- Long-lens shots (v8.14.0): `fitFov()` is the shared real-lens fit (aspect-
+  aware, 2°-80°). Wire cam + telephoto now SET their FOV from it on
+  `packPositions()` — the old wire formula ignored aspect and had a 14° floor,
+  so a 300m+ shot on a landscape PC/TV showed a speck. Landscape frames
+  everyone within 30m of the leader; portrait the leading group (12m, ≥ top 3)
 - Run to the line (grandstand, raceFrac>0.88, v8.13.0): side-on from the
   outside rail framing lead room ahead of the leader back to 3rd place, so
   the leader is on the RIGHT (travel is left→right) with chasers trailing;
@@ -169,6 +174,9 @@ main script block with node vm before every delivery.
   #204950 trackside race-meet recording (constant hum + PA caller under it).
   Pitch-based gender estimates are useless on shouting crowds (male shouts
   land in the female F0 range) — judge by source description/spectrogram.
+  v8.14.0: dropped #480755 entirely — one woman's rising held "wooo"
+  (~740→1240 Hz, >1s) read as a siren. Screen new clips for sustained tones
+  (spectral-peak runs ≥0.3s in 350-1600 Hz) before using them.
   Never rip audio from broadcasts (e.g. NBC Derby on YouTube) — the repo is public
 
 ## Related project

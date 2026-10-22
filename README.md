@@ -42,5 +42,5 @@ Crowd audio is cut from **"Free Crowd Cheering Sounds" by Gregor Quendel**
 Source: https://opengameart.org/content/free-crowd-cheering-sounds
 
 Women's and mixed-crowd cheering blended into the crowd clips comes from
-Freesound recordings released under **CC0** (public domain): craigsmith #486215
-and #480755, Avantdebris #380398 and #380400 (freesound.org/s/<id>).
+Freesound recordings released under **CC0** (public domain): craigsmith #486215,
+Avantdebris #380398 and #380400 (freesound.org/s/<id>).

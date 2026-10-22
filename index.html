@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v8.13.0</title>
+<title>Reindeer Dash v8.14.0</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -109,7 +109,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.13.0</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.14.0</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -160,7 +160,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v8.13.0';
+const VERSION='v8.14.0';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -1691,26 +1691,43 @@ function packXZ(){
 // camera position `from` aimed at `at`: each runner padded by a body length and
 // head-to-hoof height, in the current (often portrait) aspect, +20% margin.
 const FIT_TOP3=new Set(['grandstand','telephoto','headon_low','drone','wire','crane','infield']);
-function fitTop3Fov(from, at){
+// Real-lens fit: the vertical FOV that just contains `positions` (deer, padded
+// by a body length either side and hooves-to-name-tag height) as seen from
+// `from` aimed at `at`, in the CURRENT aspect — portrait phone or landscape
+// TV/PC alike — plus `margin`. Long lenses can go down to 2° (a 300m+ shot).
+function fitFov(from, at, positions, margin=1.2){
   const f=new THREE.Vector3().subVectors(at,from).normalize();
   const r=new THREE.Vector3().crossVectors(f,new THREE.Vector3(0,1,0)).normalize();
   const u=new THREE.Vector3().crossVectors(r,f);
-  const runners=topN(3).map(d=>d.group.position);
-  if(grinch && grinch.landed && !grinch.finished && grinch.group.visible) runners.push(grinch.group.position);
   let tx=0, ty=0;
   const v=new THREE.Vector3();
-  for(const p of runners){
-    for(const dy of [0,3.2]){
+  for(const p of positions){
+    for(const dy of [0,5.5]){                      // hooves … name tag
       v.set(p.x-from.x, p.y+dy-from.y, p.z-from.z);
       const z=v.dot(f); if(z<2) continue;          // behind/too close to the lens: skip
-      const pad=2.6/z;                              // body length + antlers either side
-      tx=Math.max(tx, Math.abs(v.dot(r))/z + pad);
-      ty=Math.max(ty, Math.abs(v.dot(u))/z + 0.1);
+      tx=Math.max(tx, (Math.abs(v.dot(r))+2.6)/z); // body length + antlers either side
+      ty=Math.max(ty, (Math.abs(v.dot(u))+0.8)/z);
     }
   }
   const asp=camera.aspect||0.56;
-  const half=Math.max(ty, tx/asp)*1.2;              // tan of the vertical half-angle needed
-  return Math.min(80, 2*Math.atan(half)*180/Math.PI);
+  const half=Math.max(ty, tx/asp)*margin;           // tan of the vertical half-angle needed
+  return Math.max(2, Math.min(80, 2*Math.atan(half)*180/Math.PI));
+}
+function fitTop3Fov(from, at){
+  const runners=topN(3).map(d=>d.group.position);
+  if(grinch && grinch.landed && !grinch.finished && grinch.group.visible) runners.push(grinch.group.position);
+  return fitFov(from, at, runners);
+}
+// The bunch around the leader. Landscape (TV/PC) takes everyone within 30m of
+// the front; a narrow portrait screen can't show a strung-out field of nine at
+// a useful size, so it takes the leading group (within ~5 lengths, min top 3).
+// Either way one straggler tailed off at the back can't force a wide shot.
+function packPositions(){
+  const ld=leader(); if(!ld) return [];
+  const reach=(camera.aspect||1)<1 ? 12 : 30;
+  const top3=topN(3);
+  return deerObjs.filter(d=>d && (top3.includes(d) || (!d.finished && (ld.progress-d.progress)*CIRC<reach)))
+    .map(d=>d.group.position);
 }
 function leadersFrame(){
   const t=topN(3);
@@ -2077,7 +2094,7 @@ function directCamera(dt){
     tp.set(lf.x + TR + TW + 45, 5, lf.z);
     ta.set(lf.x, 2, lf.z);
     camLabel.innerHTML='<span class="rec">●</span> TELEPHOTO';
-    targetFov=Math.max(14, Math.min(24, lf.spread*1.2));
+    targetFov=fitFov(tp, ta, packPositions(), 1.15);   // long lens filled with the bunch
     sm = raceFrac>0.6 ? 3.0 : 1.8;
 
   } else if(mode==='headon_low'){
@@ -2143,9 +2160,11 @@ function directCamera(dt){
     // as they bear down on the camera so nobody leaves the frame.
     const dx=ax-tp.x, dz=az-tp.z;
     const dist=Math.max(8, Math.hypot(dx,dz));
-    // Final pass runs a much tighter margin — punched-in on the duel
-    const halfW = earlyPass ? sprd*0.5 + 1.5 : sprd*0.42 + 2;
-    targetFov=Math.max(14, Math.min(75, 2*Math.atan(halfW/dist)*180/Math.PI));
+    // Early pass frames the bunch; the late pass the leaders plus the charging closer
+    const subj = earlyPass ? packPositions() : topN(3).map(d=>d.group.position);
+    if(!earlyPass && dramaCloser && !dramaCloser.finished && (dramaCloser.progress-P_GATE)/1.25>0.78)
+      subj.push(dramaCloser.group.position);
+    targetFov=fitFov(tp, ta, subj, 1.15);
     camLabel.innerHTML='<span class="rec">●</span> HOMESTRETCH'; sm=5.0;
 
   } else if(mode==='infield'){
@@ -2217,7 +2236,7 @@ function showResults(){
   if(rb) rb.addEventListener('click', startReplay);
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.13.0</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.14.0</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
