@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.9.1 (version string appears in exactly 4 places —
+- **Current version:** v8.9.2 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -124,6 +124,11 @@ main script block with node vm before every delivery.
   suspended at load because Chrome auto-runs AudioContexts on familiar sites).
   Pre-race it starts soft and swells through the lineup + 3-2-1 countdown,
   peaking as the gates open (`crowd.preT`).
+  One-shot clips are cut to start AT their peak (the source recordings take
+  5-6s to swell — the first cut made the gates-open cheer land ~9s late). They
+  play on their own `shotBus` that barely ducks (`SHOT_DUCK`), so the roar
+  isn't buried under "And they're off!". `crowdUpdate` steps on the audio
+  clock, not frame dt, so swells don't lag on slow phones.
   Never rip audio from broadcasts (e.g. NBC Derby on YouTube) — the repo is public
 
 ## Related project

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v8.9.1</title>
+<title>Reindeer Dash v8.9.2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -109,7 +109,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.9.1</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.9.2</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -160,7 +160,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v8.9.1';
+const VERSION='v8.9.2';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -381,10 +381,10 @@ function announcerUpdate(){
 // Two looped beds — general ambience and excited chatter — crossfade with the
 // race (murmur at the gate → building through the stretch), and one-shot roars
 // fire at the big moments. Samples: Gregor Quendel, CC-BY-4.0 (credited on results).
-const crowd={ctx:null, out:null, bed:null, excited:null, shots:{}, level:0, started:false, preT:0};
+const crowd={ctx:null, out:null, shotBus:null, bed:null, excited:null, shots:{}, level:0, started:false, preT:0};
 // Overall crowd volume. Kept well under the announcer: speechSynthesis can't be
 // boosted past volume 1, so the crowd has to sit low for the calls to cut through.
-const CROWD_VOL=0.35, CROWD_DUCK=0.4;
+const CROWD_VOL=0.35, CROWD_DUCK=0.4, SHOT_DUCK=0.8;  // roars barely duck — they ARE the moment
 // Built during model loading so the Race tap never stalls. Silent until the
 // first Race tap: browsers may auto-start a new AudioContext on sites you visit
 // often, so suspend it explicitly and keep the master at 0 until crowd.started.
@@ -394,7 +394,8 @@ function crowdPrepare(){
     const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
     const ctx=new AC(); crowd.ctx=ctx;
     if(ctx.state==='running') ctx.suspend();
-    crowd.out=ctx.createGain(); crowd.out.gain.value=0; crowd.out.connect(ctx.destination); // master: mute + announcer duck
+    crowd.out=ctx.createGain(); crowd.out.gain.value=0; crowd.out.connect(ctx.destination); // beds: mute + announcer duck
+    crowd.shotBus=ctx.createGain(); crowd.shotBus.gain.value=0; crowd.shotBus.connect(ctx.destination); // one-shot roars
     crowd.bed=ctx.createGain(); crowd.excited=ctx.createGain();
     [crowd.bed, crowd.excited].forEach(g=>{ g.gain.value=0; g.connect(crowd.out); });
     const load=n=>fetch('audio/crowd_'+n+'.mp3').then(r=>r.arrayBuffer())
@@ -420,11 +421,14 @@ function crowdRoar(name, vol){
   try{
     const src=crowd.ctx.createBufferSource(); src.buffer=buf;
     const g=crowd.ctx.createGain(); g.gain.value=vol;
-    src.connect(g); g.connect(crowd.out); src.start();
+    src.connect(g); g.connect(crowd.shotBus); src.start();
   }catch(e){}
 }
-function crowdUpdate(dt){
+function crowdUpdate(){
   if(!crowd.ctx) return;
+  // Step on the audio clock, not the (capped) frame dt — a slow phone that
+  // drops frames would otherwise make every swell lag behind the race
+  const now=crowd.ctx.currentTime, dt=Math.min(0.5, now-(crowd.lastT??now)); crowd.lastT=now;
   let tgt;
   if(paused&&racing) tgt=0.03;
   else if(replayActive) tgt=0.45;
@@ -442,6 +446,7 @@ function crowdUpdate(dt){
     // ~6-8 dB from the final turn, peaking right at the line
     const b=Math.max(0,Math.min(1,(frac-0.62)/0.33));
     tgt = finishCounter>0 ? 0.6 : 0.28+0.47*b*b*(3-2*b);
+    tgt = Math.max(tgt, 0.6-0.08*raceTime);   // gates-open roar carries ~4s, then settles
   } else tgt=0.12;   // results / title screen
   if(!preRace) crowd.preT=0;
   crowd.level += (tgt-crowd.level)*Math.min(1, dt*(tgt>crowd.level?2.0:0.6));
@@ -449,9 +454,10 @@ function crowdUpdate(dt){
   crowd.bed.gain.setTargetAtTime(0.6*Math.min(1,L*3), t, 0.1);
   crowd.excited.gain.setTargetAtTime(0.7*Math.max(0,(L-0.2)/0.8), t, 0.1);
   // Master: mute with the 🔊 button; duck under the announcer so calls stay clear
-  let m=(ann.on && crowd.started)?CROWD_VOL:0;
-  try{ if(m && window.speechSynthesis && speechSynthesis.speaking) m*=CROWD_DUCK; }catch(e){}
+  let m=(ann.on && crowd.started)?CROWD_VOL:0, ms=m;
+  try{ if(m && window.speechSynthesis && speechSynthesis.speaking){ m*=CROWD_DUCK; ms*=SHOT_DUCK; } }catch(e){}
   crowd.out.gain.setTargetAtTime(m, t, 0.25);
+  crowd.shotBus.gain.setTargetAtTime(ms, t, 0.1);
 }
 let dramaCloser=null;  // the designated come-from-behind runner this race
 let dramaCloserWins=true; // ~80% of races the charge gets there; sometimes a nose short
@@ -2089,7 +2095,7 @@ function showResults(){
   if(rb) rb.addEventListener('click', startReplay);
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.9.1</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.9.2</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
@@ -2187,7 +2193,7 @@ function animate(){
   speedBtn.style.display = racing ? 'block' : 'none';
   updateSparkles(rawDt);
   updateSnow(rawDt);
-  crowdUpdate(rawDt);
+  crowdUpdate();
   if(replayActive){ updateReplay(rawDt); renderer.render(scene, camera); return; }
   if(paused && racing){ renderer.render(scene, camera); return; }
   if(racing) updateRace(dt);
