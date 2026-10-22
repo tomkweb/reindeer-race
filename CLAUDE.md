@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.9.2 (version string appears in exactly 4 places —
+- **Current version:** v8.10.0 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -72,6 +72,13 @@ wire cam with surge-adaptive zoom (blends aim toward the charging closer)
   auto-director picks)
 - Stretch drive: tags fan out by running order (rank-based heights) so
   nose-to-nose runners stay readable
+- Name tags (v8.10.0): `makeTag()` pills trimmed to the name's width;
+  `sizeTag()` holds them at ~3.5% of frame height (0.35-0.9m world clamp) so
+  they don't balloon in close shots. Blimp keeps big 3.75m-tall tags
+- Framing rule (Tom): the tightest leader-tracking shot must still show the
+  leader AND the next two. `fitTop3Fov()` widens (never narrows) the FOV of
+  every mode in `FIT_TOP3` until the top 3 (+ landed Grinch) fit in the
+  current aspect
 - Photo finish: camera ON the finish-line axis at the outside rail, deer
   snapped so nose touches the line, forced portrait 480×854 render,
   fenceGroup + finishPoles hidden during the one-frame capture
@@ -96,7 +103,12 @@ Changing STR/TR requires auditing every camera position and camera.far.
 Local libs at `race_v2/libs/` (npm pack three@0.128.0), model fetched from
 raw.githubusercontent (allowed domain). Build test_local.html by swapping
 CDN URLs for local paths; inject window.JUMP(p) / window.CAM(m) helpers.
-Playwright headless (SwiftShader) for rendering/UI; **race dynamics are
+Playwright headless (SwiftShader) for rendering/UI. On this Windows PC,
+plain headless Chrome works too: serve the folder (`python -m http.server`),
+inject a click on #startBtn + `JUMP`, and for still frames patch the camera
+lerp to snap (`a=1`, `currentFov=targetFov`) and drop leadersFrame's 0.55s
+lead. Headless windows are never narrower than 500px — a 412px screenshot
+silently crops the right edge, so shoot at 500x1040; **race dynamics are
 verified in Node simulations** mirroring the exact speed equations —
 headless rAF throttling makes live-race timing useless. Syntax-check the
 main script block with node vm before every delivery.
@@ -128,7 +140,10 @@ main script block with node vm before every delivery.
   5-6s to swell — the first cut made the gates-open cheer land ~9s late). They
   play on their own `shotBus` that barely ducks (`SHOT_DUCK`), so the roar
   isn't buried under "And they're off!". `crowdUpdate` steps on the audio
-  clock, not frame dt, so swells don't lag on slow phones.
+  clock, not frame dt, so swells don't lag on slow phones. Gates open: cheer
+  + instant level jump, no announcer duck for 3.5s. Audio URLs carry
+  `?v=VERSION` — Pages caches files ~10 min, and a stale clip once made the
+  start surge seem ~9s late on Tom's phone.
   Never rip audio from broadcasts (e.g. NBC Derby on YouTube) — the repo is public
 
 ## Related project

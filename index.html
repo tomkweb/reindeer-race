@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v8.9.2</title>
+<title>Reindeer Dash v8.10.0</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -109,7 +109,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.9.2</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.10.0</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -160,7 +160,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v8.9.2';
+const VERSION='v8.10.0';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -398,7 +398,8 @@ function crowdPrepare(){
     crowd.shotBus=ctx.createGain(); crowd.shotBus.gain.value=0; crowd.shotBus.connect(ctx.destination); // one-shot roars
     crowd.bed=ctx.createGain(); crowd.excited=ctx.createGain();
     [crowd.bed, crowd.excited].forEach(g=>{ g.gain.value=0; g.connect(crowd.out); });
-    const load=n=>fetch('audio/crowd_'+n+'.mp3').then(r=>r.arrayBuffer())
+    // ?v= busts the 10-minute GitHub Pages cache so a new deploy can't play stale clips
+    const load=n=>fetch('audio/crowd_'+n+'.mp3?v='+VERSION).then(r=>r.arrayBuffer())
       .then(b=>new Promise((ok,no)=>ctx.decodeAudioData(b,ok,no)));  // callback form for older Safari
     ['bed','excited'].forEach(n=>load(n).then(buf=>{
       const src=ctx.createBufferSource(); src.buffer=buf; src.loop=true;
@@ -446,7 +447,7 @@ function crowdUpdate(){
     // ~6-8 dB from the final turn, peaking right at the line
     const b=Math.max(0,Math.min(1,(frac-0.62)/0.33));
     tgt = finishCounter>0 ? 0.6 : 0.28+0.47*b*b*(3-2*b);
-    tgt = Math.max(tgt, 0.6-0.08*raceTime);   // gates-open roar carries ~4s, then settles
+    tgt = Math.max(tgt, 0.8-0.12*raceTime);   // gates-open roar carries ~4s, then settles
   } else tgt=0.12;   // results / title screen
   if(!preRace) crowd.preT=0;
   crowd.level += (tgt-crowd.level)*Math.min(1, dt*(tgt>crowd.level?2.0:0.6));
@@ -455,7 +456,8 @@ function crowdUpdate(){
   crowd.excited.gain.setTargetAtTime(0.7*Math.max(0,(L-0.2)/0.8), t, 0.1);
   // Master: mute with the 🔊 button; duck under the announcer so calls stay clear
   let m=(ann.on && crowd.started)?CROWD_VOL:0, ms=m;
-  try{ if(m && window.speechSynthesis && speechSynthesis.speaking){ m*=CROWD_DUCK; ms*=SHOT_DUCK; } }catch(e){}
+  const noDuck = racing && raceTime<3.5;   // let the break roar over "And they're off!"
+  try{ if(m && !noDuck && window.speechSynthesis && speechSynthesis.speaking){ m*=CROWD_DUCK; ms*=SHOT_DUCK; } }catch(e){}
   crowd.out.gain.setTargetAtTime(m, t, 0.25);
   crowd.shotBus.gain.setTargetAtTime(ms, t, 0.1);
 }
@@ -1044,17 +1046,7 @@ function setupDeer(deerScene, runClip, idleClip, idx){
   cloth.position.y=-.24;
   elf.add(cloth);
   // Floating name tag — canvas sprite, always faces camera
-  const cv=document.createElement('canvas'); cv.width=512; cv.height=128;
-  const cx2=cv.getContext('2d');
-  cx2.fillStyle=SILKS[idx];
-  cx2.beginPath(); cx2.roundRect(6,8,500,112,48); cx2.fill();
-  cx2.fillStyle=(idx===3||idx===8)?'#222':'#fff'; // dark text on yellow/white
-  cx2.font='bold 72px sans-serif'; cx2.textAlign='center'; cx2.textBaseline='middle';
-  cx2.fillText(NAMES[idx],256,66);
-  const tagTex=new THREE.CanvasTexture(cv);
-  const tag=new THREE.Sprite(new THREE.SpriteMaterial({map:tagTex,depthTest:false,transparent:true,opacity:.95}));
-  tag.scale.set(5.2,1.3,1);
-  scene.add(tag); // world space — tracked per frame
+  const tag=makeTag(NAMES[idx], SILKS[idx], (idx===3||idx===8)?'#222':'#fff'); // dark text on yellow/white
   elf.scale.setScalar(2.2);
   scene.add(elf);
 
@@ -1153,7 +1145,7 @@ function beginRace(){
     showCountdown(()=>{ preRace=false; racing=true;
       ann.flags={}; ann.lastCall=0; ann.lastLeadIdx=-1; ann.lastLeadT=-10;
       say("And they're off!",{force:true,rate:1.25,pitch:1.15});
-      crowdRoar('cheer',0.8);
+      crowdRoar('cheer',0.9); crowd.level=Math.max(crowd.level,0.8);  // gates open: instant surge
       gateOpenAnim=0.4; // doors fly open
       // Hide finish line until last deer clears the first curve
       finishLineGroup.forEach(o=>o.visible=false);
@@ -1228,16 +1220,7 @@ function buildGrinch(){
   g.visible=false;
   scene.add(g);
   // Name tag — same canvas-sprite style as the deer
-  const cv=document.createElement('canvas'); cv.width=512; cv.height=128;
-  const c2=cv.getContext('2d');
-  c2.fillStyle='#2f9e44';
-  c2.beginPath(); c2.roundRect(6,8,500,112,48); c2.fill();
-  c2.fillStyle='#fff'; c2.font='bold 64px sans-serif';
-  c2.textAlign='center'; c2.textBaseline='middle';
-  c2.fillText('The Grinch',256,66);
-  const tag=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),depthTest:false,transparent:true,opacity:.95}));
-  tag.scale.set(5.2,1.3,1); tag.visible=false;
-  scene.add(tag);
+  const tag=makeTag('The Grinch', '#2f9e44', '#fff'); tag.visible=false;
   return {group:g, tag, arms, name:'The Grinch', progress:0, speed:0, finished:false,
           place:0, dropping:false, landed:false, dropY:0, curLane:0, stretchLane:null};
 }
@@ -1370,9 +1353,39 @@ function updateGrinch(dt){
     const toLine=(P_FINISH-grinch.progress)*CIRC;
     if(toLine<20) grinchLaughPose(raceTime); else grinchLaughReset();
     grinch.tag.position.set(gp.x, grinch.dropY + 4.0, gp.z);
-    const tagSc=(activeCam==='blimp')?15.0:5.2;
-    grinch.tag.scale.set(tagSc, tagSc*0.25, 1);
+    sizeTag(grinch.tag);
   }
+}
+
+// Name tag: a pill trimmed to the name's width (short names get short pills).
+// Canvas-sprite, always faces camera; sized each frame by sizeTag().
+function makeTag(text, bg, fg){
+  const cv=document.createElement('canvas'); cv.height=96;
+  let c=cv.getContext('2d'); const font='bold 60px sans-serif';
+  c.font=font;
+  cv.width=Math.max(160, Math.ceil(c.measureText(text).width)+56);
+  c=cv.getContext('2d');   // resizing the canvas resets its state
+  c.fillStyle=bg; c.beginPath(); c.roundRect(4,4,cv.width-8,cv.height-8,40); c.fill();
+  c.fillStyle=fg; c.font=font; c.textAlign='center'; c.textBaseline='middle';
+  c.fillText(text, cv.width/2, cv.height/2+3);
+  const tag=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),depthTest:false,transparent:true,opacity:.95}));
+  tag.userData.aspect=cv.width/cv.height;
+  tag.scale.set(tag.userData.aspect, 1, 1);
+  scene.add(tag);
+  return tag;
+}
+// Hold tags at roughly a constant SCREEN size (~3.5% of frame height) so they
+// stay small in close shots instead of filling the frame; capped at 0.9m tall
+// so wide shots don't get billboards. Blimp keeps its big overhead tags.
+function sizeTag(tag){
+  let h;
+  if(activeCam==='blimp') h=3.75;
+  else {
+    const dist=camera.position.distanceTo(tag.position);
+    h=0.035*2*dist*Math.tan(camera.fov*Math.PI/360);
+    h=Math.max(0.35, Math.min(0.9, h));
+  }
+  tag.scale.set(h*tag.userData.aspect, h, 1);
 }
 
 function trackAttachments(){
@@ -1407,9 +1420,7 @@ function trackAttachments(){
       let tagH = (activeCam==='blimp') ? 12+row*3 : 4.9+row*0.95;
       if(stretchRank && activeCam!=='blimp') tagH = 4.2 + stretchRank.get(d)*0.85;
       d.tag.position.set(d.group.position.x, d.group.position.y+tagH, d.group.position.z);
-      // Scale up for blimp — sprites are screen-space but position matters for occlusion
-      const tagSc = (activeCam==='blimp') ? 15.0 : 5.2;
-      d.tag.scale.set(tagSc, tagSc*0.25, 1);
+      sizeTag(d.tag);
     }
     d.elf.rotation.y=d.group.rotation.y;
   });
@@ -1513,6 +1524,7 @@ function updateReplay(dt){
       if(Math.abs(grinch.group.position.z)<22 && grinch.group.position.x>TR-TW) grinchLaughPose(replayT);
       else grinchLaughReset();
       grinch.tag.position.set(grinch.group.position.x, grinch.group.position.y+4.0, grinch.group.position.z);
+      sizeTag(grinch.tag);
     } else { grinch.group.visible=false; grinch.tag.visible=false; }
   }
   trackAttachments();
@@ -1613,6 +1625,31 @@ function packXZ(){
 }
 // Bounding info for top-3 leaders: centre + spread. Centre is weighted toward
 // the race leader so the leader is guaranteed prominent in every shot.
+// Vertical FOV that fits the top 3 runners (plus a landed Grinch) as seen from
+// camera position `from` aimed at `at`: each runner padded by a body length and
+// head-to-hoof height, in the current (often portrait) aspect, +20% margin.
+const FIT_TOP3=new Set(['grandstand','telephoto','headon_low','drone','wire','crane','infield']);
+function fitTop3Fov(from, at){
+  const f=new THREE.Vector3().subVectors(at,from).normalize();
+  const r=new THREE.Vector3().crossVectors(f,new THREE.Vector3(0,1,0)).normalize();
+  const u=new THREE.Vector3().crossVectors(r,f);
+  const runners=topN(3).map(d=>d.group.position);
+  if(grinch && grinch.landed && !grinch.finished && grinch.group.visible) runners.push(grinch.group.position);
+  let tx=0, ty=0;
+  const v=new THREE.Vector3();
+  for(const p of runners){
+    for(const dy of [0,3.2]){
+      v.set(p.x-from.x, p.y+dy-from.y, p.z-from.z);
+      const z=v.dot(f); if(z<2) continue;          // behind/too close to the lens: skip
+      const pad=2.6/z;                              // body length + antlers either side
+      tx=Math.max(tx, Math.abs(v.dot(r))/z + pad);
+      ty=Math.max(ty, Math.abs(v.dot(u))/z + 0.1);
+    }
+  }
+  const asp=camera.aspect||0.56;
+  const half=Math.max(ty, tx/asp)*1.2;              // tan of the vertical half-angle needed
+  return Math.min(80, 2*Math.atan(half)*180/Math.PI);
+}
 function leadersFrame(){
   const t=topN(3);
   if(t.length===0) return {x:TC_X, z:TC_Z, spread:10};
@@ -1914,7 +1951,7 @@ function directCamera(dt){
     if(finalRun && grinchRace && grinch && grinch.group.visible && grinch.speed>0.5){
       cx=grinch.group.position.x; cz=grinch.group.position.z;
     }
-    const dist = finalRun ? 4.5 + lf.spread*0.5 : 6 + lf.spread*0.8;
+    const dist = finalRun ? 8 + lf.spread*0.6 : 6 + lf.spread*0.8;
     tp.set(cx + (TW/2 + dist), finalRun ? 2.4+lf.spread*0.1 : 3+lf.spread*0.15, cz);
     ta.set(cx, 2, cz);
     if(finalRun) targetFov=44;
@@ -2044,6 +2081,10 @@ function directCamera(dt){
     camLabel.innerHTML='<span class="rec">●</span> AERIAL'; targetFov=54; sm=1.2;
   }
 
+  // Leader-tracking shots may only be as tight as the leader + the next two
+  // runners allow — widen the lens (never narrow it) until all three fit.
+  if(FIT_TOP3.has(mode)) targetFov=Math.max(targetFov, fitTop3Fov(tp, ta));
+
   const a=1-Math.exp(-sm*dt);
   camPos.lerp(tp,a); camAim.lerp(ta,a);
   if(!isFinite(camPos.x)||!isFinite(camPos.y)||!isFinite(camPos.z)){ camPos.copy(tp); }
@@ -2095,7 +2136,7 @@ function showResults(){
   if(rb) rb.addEventListener('click', startReplay);
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.9.2</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.10.0</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
