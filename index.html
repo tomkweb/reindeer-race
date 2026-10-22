@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v8.11.0</title>
+<title>Reindeer Dash v8.12.0</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -109,7 +109,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.11.0</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.12.0</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -160,7 +160,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v8.11.0';
+const VERSION='v8.12.0';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -248,7 +248,7 @@ let racing=false, raceTime=0, finishCounter=0, finishedAll=false, postTimer=0;
 let paused=false;
 let speedMult=1;
 // ── RACE ANNOUNCER (Web Speech API — no audio assets needed) ──
-const ann={on:true, lastCall:0, lastLeadIdx:-1, lastLeadT:-10, flags:{}, voice:null};
+const ann={on:true, lastCall:0, lastLeadIdx:-1, calledLeadIdx:-1, leadSince:0, lastLeadT:-10, flags:{}, voice:null, cur:null, pending:null};
 // A British male race caller — the classic Ascot/York sound. Voice names differ
 // per platform, so walk a preference list: Chrome desktop, Edge/Windows natural
 // voices, Apple, then Android Google TTS (gender isn't exposed there — rjs/gbd
@@ -274,13 +274,35 @@ if(window.speechSynthesis){
   pickVoice();
   speechSynthesis.addEventListener('voiceschanged', pickVoice);
 }
+// Priority-aware speech so the call stays in sync with the race:
+//   pri 1 colour/roll call — only if the caller is idle
+//   pri 2 race event (lead change) — waits in the one-line queue behind the
+//         current line (colour lines are short), dropped if stale when its turn comes
+//   pri 3 landmark (turn for home, a furlong out…) — same queue, outranks pri 2
+//   pri 4 (opts.force) — the break, the Grinch, the winner: cuts in immediately
+// Queuing instead of cutting in keeps lines from being chopped mid-word.
+// opts.valid() is re-checked when a queued line finally plays, and txt may be a
+// function so a queued line describes the race as it is when it's spoken.
+// Lines are kept short: a 4-name roll call took ~4s, and by the end of it the
+// order it described had changed — the main source of "out of sync".
+// Returns true if the line was spoken (or queued), false if dropped.
 function say(txt, opts={}){
-  if(!ann.on) return;
+  if(!ann.on) return false;
   try{
-    if(!window.speechSynthesis) return;
-    if(opts.force) speechSynthesis.cancel();
-    else if(speechSynthesis.speaking) return;
-    const u=new SpeechSynthesisUtterance(txt);
+    if(!window.speechSynthesis) return false;
+    const pri = opts.force ? 4 : (opts.pri||1);
+    const busy = speechSynthesis.speaking && ann.cur;
+    if(busy){
+      if(pri<=1) return false;
+      if(pri<4){
+        const q=ann.pending;
+        if(q && q.pri>pri && performance.now()<q.until) return false;  // a bigger call is already waiting
+        ann.pending={txt, opts, pri, until:performance.now()+(pri>=3?2500:1800)};
+        return true;
+      }
+    }
+    speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(typeof txt==='function' ? txt() : txt);
     if(ann.voice){ u.voice=ann.voice; u.lang=ann.voice.lang; } else u.lang='en-GB';
     // High-energy caller: brisk (~3 words/s, like real callers, who don't
     // speed up much at the finish) and pitched up from the first call, climbing
@@ -288,79 +310,111 @@ function say(txt, opts={}){
     const r=opts.rate||1.15, p=opts.pitch||1.05;
     u.rate=1.15+Math.min(0.1,Math.max(0,(r-1.1)*0.3));
     u.pitch=Math.min(1.9, 1.15+Math.max(0,p-1)*2.0); u.volume=1;
+    const me={pri}; ann.cur=me;
+    u.onend=u.onerror=()=>{
+      if(ann.cur!==me) return;
+      ann.cur=null;
+      const q=ann.pending; ann.pending=null;
+      if(q && performance.now()<q.until && (!q.opts.valid || q.opts.valid())) say(q.txt, q.opts);
+    };
     speechSynthesis.speak(u);
-  }catch(e){}
+    return true;
+  }catch(e){ return false; }
 }
 const pick=arr=>arr[Math.floor(Math.random()*arr.length)];
+// Where the field actually is, as a fraction of the race (leader's distance run).
+// Gate sits 28m before the homestretch; the race is 1.25 laps, CCW, so the
+// boundaries come from the real track geometry (S1..S3), not round numbers.
+const GATE_D=(1-(P_GATE%1))*CIRC, RACE_M=1.25*CIRC;
+const SEG={
+  turn1: GATE_D/RACE_M,                 // past the post first time → first turn  (~0.20)
+  back:  (GATE_D-S3+CIRC)/RACE_M,       // out of the first turn → backstretch   (~0.42)
+  far:   (GATE_D-S2+CIRC)/RACE_M,       // backstretch → far turn                (~0.60)
+  home:  (GATE_D-S1+CIRC)/RACE_M        // out of the far turn → homestretch     (~0.82)
+};
+const lengthsTxt=L=> L<0.3 ? pick(['a neck','a head']) : L<0.75 ? 'half a length'
+  : L<1.25 ? 'a length' : L<1.75 ? 'a length and a half' : `${Math.round(L)} lengths`;
 function announcerUpdate(){
   if(!racing) return;
+  // Safety net: some Android TTS engines occasionally skip the 'end' event, which
+  // would strand the queued line (and block colour calls) — flush it ourselves
+  if(ann.pending && window.speechSynthesis && !speechSynthesis.speaking){
+    const q=ann.pending; ann.pending=null; ann.cur=null;
+    if(performance.now()<q.until && (!q.opts.valid || q.opts.valid())) say(q.txt, q.opts);
+  }
   const ld=leader(); if(!ld) return;
   const frac=(ld.progress-P_GATE)/1.25;
   const F=ann.flags;
-  // Excitement escalates with the race — faster and higher as they get closer to home
-  const exR=1.02+frac*0.42, exP=1.0+frac*0.3;
-  // ── landmark calls, varied phrasing ──
-  if(!F.q1 && frac>=0.15){ F.q1=true;
-    say(pick([`${ld.name} breaks on top as they head into the first turn!`,
-      `Into the first turn, and it's ${ld.name} showing the way!`]),{rate:exR,pitch:exP}); }
-  if(!F.back && frac>=0.30){ F.back=true;
-    say(pick(['Down the backstretch they go!',
-      'They hit the backstretch — and the pace is HOT!',
-      `Down the back side, ${ld.name} clinging to the lead!`]),{rate:exR,pitch:exP}); }
-  if(!F.half && frac>=0.50){ F.half=true;
-    const t2=topN(2);
-    say(pick([`Halfway home! ${t2[0].name} and ${t2[1].name} are putting on a show!`,
-      `At the half, it's ${t2[0].name}! But this pack is TIGHT!`]),{rate:exR,pitch:exP}); }
-  if(!F.mile && frac>=0.60){ F.mile=true;
-    say(pick([`Half a mile to run, and ${ld.name} still holds the call!`,
-      `Four furlongs left. ${ld.name} in front, and the pack are closing up!`]),{rate:exR,pitch:exP}); }
-  if(!F.far && frac>=0.68){ F.far=true;
-    say(pick(['Around the final turn — here they come!',
-      'They lean into the final turn! Hold onto your hats!',
-      `Final turn! ${ld.name} in front, but ANYBODY can win this!`]),{force:true,rate:exR,pitch:exP}); }
-  if(!F.stretch && frac>=0.85){ F.stretch=true;
-    const t2=topN(2);
-    say(pick([`DOWN THE STRETCH THEY COME! It's ${t2[0].name} and ${t2[1]?t2[1].name:''}!`,
-      `They turn for home! ${t2[0].name} digs in — ${t2[1]?t2[1].name:''} won't go away!`]),{force:true,rate:1.42,pitch:1.32}); }
-  if(!F.furlong && frac>=0.90){ F.furlong=true;
-    say(pick(['A furlong to go!','One furlong left!']),{force:true,rate:1.3,pitch:1.3}); }
-  if(!F.duel && frac>=0.93){ F.duel=true;
-    const t2=topN(2);
-    if(t2.length>1) say(`Inside the final furlong! ${t2[0].name}! ${t2[1].name}! Nothing between them!`,{force:true,rate:1.45,pitch:1.38}); }
-  if(!F.closer && dramaCloser && !dramaCloser.finished && frac>=0.83){ F.closer=true; crowdRoar('surge',0.7);
-    say(pick([`WAIT — here comes ${dramaCloser.name}, FLYING on the outside!`,
-      `${dramaCloser.name} has found another gear! What a run!`,
-      `Out of NOWHERE — ${dramaCloser.name} is charging down the middle of the track!`]),{force:true,rate:1.42,pitch:1.32}); }
-  // ── lead changes ──
+  const ord=topN(9);
+  const gapL=(a,b)=>(a.progress-b.progress)*CIRC/2.5;   // a length ≈ 2.5m
   const li=deerObjs.indexOf(ld);
-  if(li!==ann.lastLeadIdx){
-    if(ann.lastLeadIdx>=0 && frac>0.06 && frac<0.80 && raceTime-ann.lastLeadT>4){
-      say(pick([`${ld.name} takes the lead!`,
-        `And now it's ${ld.name} in front!`,
-        `${ld.name} surges to the front!`,
-        `${ld.name} says not so fast — and takes over!`]),{rate:exR,pitch:exP});
-      ann.lastLeadT=raceTime;
-    }
-    ann.lastLeadIdx=li;
+  // Any line that names the current leader counts as calling the lead
+  const named=()=>{ ann.calledLeadIdx=li; ann.lastLeadT=raceTime; };
+  // Excitement escalates with the race — pitch climbs as they get closer to home
+  const exR=1.02+frac*0.42, exP=1.0+frac*0.3;
+  const L3={pri:3,rate:exR,pitch:exP};
+  // ── landmark calls at the real track positions (each names the leader) ──
+  if(!F.turn1 && frac>=SEG.turn1-0.02){ F.turn1=true;
+    if(say(()=>{ const o=topN(2), ld=o[0]; return pick([`Past the post the first time, ${ld.name} leads them into the turn!`,
+      `Into the first turn, and it's ${ld.name} showing the way!`]); },L3)) named(); }
+  if(!F.back && frac>=SEG.back){ F.back=true;
+    if(say(()=>{ const o=topN(2), ld=o[0]; return pick([`Down the backstretch, ${ld.name} in front!`,
+      `They straighten up on the back side, ${ld.name} leads ${o[1].name}!`]); },L3)) named(); }
+  if(!F.far && frac>=SEG.far){ F.far=true;
+    if(say(()=>{ const o=topN(2), ld=o[0]; return pick([`Into the far turn, ${ld.name} leads, four furlongs to run!`,
+      `Around the far turn they go, ${ld.name} still in front!`]); },L3)) named(); }
+  if(!F.home && frac>=SEG.home){ F.home=true;
+    if(say(()=>{ const o=topN(2), ld=o[0]; return pick([`They turn for home! ${o[0].name} from ${o[1].name}!`,
+      `DOWN THE STRETCH THEY COME! ${o[0].name} and ${o[1].name}!`]); },{pri:3,rate:1.42,pitch:1.32})) named(); }
+  if(!F.furlong && frac>=0.90){ F.furlong=true;
+    if(say(()=>`A furlong to go, ${leader().name} in front!`,{pri:3,rate:1.3,pitch:1.3})) named(); }
+  if(!F.final && frac>=0.95){ F.final=true;
+    // Never call the winner early — the closer (or the Grinch) can still come
+    if(say(()=>{ const o=topN(2), g=gapL(o[0],o[1]); return g<1.5 ? `${o[0].name}! ${o[1].name}! Nothing between them!`
+      : `${o[0].name} ${lengthsTxt(g)} clear, ${o[1].name} chasing hard!`; },{pri:3,rate:1.45,pitch:1.38})) named(); }
+  // ── the closer's run, called the moment it charges into the places ──
+  if(!F.closer3 && dramaCloser && !dramaCloser.finished && frac>0.70){
+    const cr=ord.indexOf(dramaCloser);
+    if(cr>=1 && cr<=2){ F.closer3=true; crowdRoar('surge',0.7);
+      say(pick([`Here comes ${dramaCloser.name}, FLYING on the outside!`,
+        `${dramaCloser.name} has found another gear!`,
+        `Out of nowhere, ${dramaCloser.name} is charging!`]),{pri:3,rate:1.42,pitch:1.32}); }
   }
-  // ── running commentary (a length ≈ 2.5m). Real callers barely draw breath,
-  // so call every ~4s; say() skips the line if the last one is still going.
-  // Mostly running-order roll calls, the way the field gets read out on TV.
-  if(frac>0.08 && frac<0.66 && raceTime-ann.lastCall>4){
-    ann.lastCall=raceTime;
-    const t4=topN(4);
-    if(t4.length>3){
-      const gapM=(t4[0].progress-t4[1].progress)*CIRC;
-      const L=gapM/2.5;
-      const gapTxt = L<0.3 ? pick(['a neck','a head']) : L<0.75 ? 'half a length'
-        : L<1.25 ? 'a length' : L<1.75 ? 'a length and a half'
-        : `${Math.round(L)} lengths`;
-      say(pick([
-        `${t4[0].name} leads by ${gapTxt} from ${t4[1].name}. ${t4[2].name} is third, then ${t4[3].name}.`,
-        `${t4[0].name} in front by ${gapTxt}. ${t4[1].name} second, ${t4[2].name} third, ${t4[3].name} on the outside.`,
-        `It's ${t4[0].name}, ${gapTxt} to ${t4[1].name}, then comes ${t4[2].name}, and ${t4[3].name} tracking them.`,
-        `${t4[0].name} still the leader. ${t4[1].name} poised in second, ${gapTxt} away.`]),{rate:exR,pitch:exP});
+  // ── lead changes, all race long. The new leader must hold it ~0.6s so a
+  // nose-bob doesn't trigger a call; calls are spaced (closer together late).
+  // A change that can't be called yet stays owed and is called as soon as the
+  // caller is free — it's never silently dropped.
+  if(li!==ann.lastLeadIdx){ ann.lastLeadIdx=li; ann.leadSince=raceTime; }
+  else if(li!==ann.calledLeadIdx && raceTime-ann.leadSince>0.6
+          && raceTime-ann.lastLeadT>(frac>SEG.home?1.2:2.5) && frac>0.04){
+    if(ann.calledLeadIdx<0) named();   // first leader of the race — the break call covers it
+    else { const was=deerObjs[ann.calledLeadIdx].name;
+      if(say(pick([`${ld.name} takes the lead!`, `Now it's ${ld.name} in front!`,
+      `${ld.name} goes past ${was}!`, `${ld.name} hits the front!`, `${was} is headed, ${ld.name} leads!`,
+      `${ld.name} edges ahead of ${was}!`]),
+      {pri:2,rate:exR,pitch:exP,valid:()=>leader()===ld})) named(); }
+  }
+  // ── running colour: short roll calls, only when the caller is free ──
+  // (held back while a lead change is owed, so the change gets the floor first)
+  if(frac>0.05 && frac<SEG.home && raceTime-ann.lastCall>3 && li===ann.calledLeadIdx){
+    if(!(window.speechSynthesis && speechSynthesis.speaking) && !ann.pending){
+      ann.lastCall=raceTime;
+      const g=lengthsTxt(gapL(ord[0],ord[1]));
+      if(say(pick([
+        `${ord[0].name} by ${g}, ${ord[1].name} second, ${ord[2].name} third.`,
+        `${ord[0].name} leads ${ord[1].name} by ${g}.`,
+        `${ord[0].name} in front, ${ord[1].name} ${g} back.`,
+        `${ord[0].name}, ${ord[1].name}, then ${ord[2].name}.`]),{pri:1,rate:exR,pitch:exP})) named();
     }
+  }
+  // ── the stretch run: urgent two-name calls whenever the caller is free ──
+  if(frac>=SEG.home+0.015 && frac<0.985 && finishCounter===0 && raceTime-ann.lastCall>2
+     && li===ann.calledLeadIdx && !(window.speechSynthesis && speechSynthesis.speaking) && !ann.pending){
+    ann.lastCall=raceTime;
+    const g=gapL(ord[0],ord[1]);
+    say(g<1 ? pick([`${ord[0].name} and ${ord[1].name}, head to head!`,`${ord[1].name} won't go away!`])
+      : pick([`${ord[0].name} digs in, ${ord[1].name} closing!`,`${ord[0].name} by ${lengthsTxt(g)}!`,`${ord[1].name} chasing, ${ord[2].name} on the outside!`]),
+      {pri:1,rate:1.4,pitch:1.3});
   }
   // ── winner + placings ──
   if(!F.win && finishCounter>0){ F.win=true; crowdRoar('roar',0.8);
@@ -369,12 +423,12 @@ function announcerUpdate(){
       'The Grinch WINS IT! You hate to see it, folks!']),{force:true,rate:1.28,pitch:1.22});
     else if(w) say(pick([`${w.name}! ${w.name} WINS IT!`,
       `${w.name} gets there! What! A! Finish!`,
-      `At the wire — it's ${w.name}! Oh my goodness!`]),{force:true,rate:1.35,pitch:1.3});
+      `At the wire, it's ${w.name}! Oh my goodness!`]),{force:true,rate:1.35,pitch:1.3});
   }
   if(!F.placed && finishCounter>=3){ F.placed=true;
     const p2=deerObjs.find(d=>d&&d.place===2)||( grinch&&grinch.place===2?grinch:null);
     const p3=deerObjs.find(d=>d&&d.place===3);
-    if(p2&&p3) say(`${p2.name} takes second, ${p3.name} holds on for third!`,{rate:1.15,pitch:1.1});
+    if(p2&&p3) say(`${p2.name} takes second, ${p3.name} holds on for third!`,{pri:3,rate:1.15,pitch:1.1});
   }
 }
 // ── CROWD NOISE (Web Audio, recorded samples in audio/) ──
@@ -1134,6 +1188,10 @@ function configureRace(){
 function beginRace(){
   crowdInit();
   configureRace();
+  // Scene-setter during the gate lineup — also wakes the speech engine, whose
+  // first utterance lags (esp. Android), so "And they're off!" lands on the break
+  ann.cur=null; ann.pending=null;
+  say(pick(["They're in the gate for the Reindeer Dash!","Nine reindeer, one prize. They're loading up!"]),{force:true,rate:1.15,pitch:1.1});
   overlay.classList.add('off');
   camBar.style.display='flex';
   preRace=true; preRaceTimer=0;
@@ -1144,7 +1202,7 @@ function beginRace(){
   // After PRE_RACE_DUR, show countdown then open gates
   setTimeout(()=>{
     showCountdown(()=>{ preRace=false; racing=true;
-      ann.flags={}; ann.lastCall=0; ann.lastLeadIdx=-1; ann.lastLeadT=-10;
+      ann.flags={}; ann.lastCall=0; ann.lastLeadIdx=-1; ann.calledLeadIdx=-1; ann.lastLeadT=-10; ann.pending=null;
       say("And they're off!",{force:true,rate:1.25,pitch:1.15});
       crowdRoar('cheer',0.9); crowd.level=Math.max(crowd.level,0.8);  // gates open: instant surge
       gateOpenAnim=0.4; // doors fly open
@@ -2137,7 +2195,7 @@ function showResults(){
   if(rb) rb.addEventListener('click', startReplay);
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.11.0</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.12.0</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;

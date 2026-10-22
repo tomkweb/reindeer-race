@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.11.0 (version string appears in exactly 4 places —
+- **Current version:** v8.12.0 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -56,10 +56,22 @@ transcribed; audio + frames measured locally, nothing from it committed):
   wire, nearly an octave) and volume. `say()` keeps rate brisk and near-flat
   (1.15-1.25) and maps call-site pitch onto 1.15-1.9 — Tom wants a high-energy,
   higher-pitched caller (v8.9.0), not a low baritone.
-- **Content:** near-continuous running-order roll calls (top 4 + gap in
-  lengths: neck / half a length / a length and a half…) every ~4s, plus
-  furlong markers (half a mile, a furlong to go, inside the final furlong).
-  The race is 1.25 "miles" = 10 furlongs.
+- **Sync (v8.12.0):** `say()` is priority-aware — pri 1 colour (idle only),
+  pri 2 lead change, pri 3 landmark, pri 4/force (break, Grinch, winner) cuts
+  in. Pri 2-3 wait in a one-line queue instead of chopping the current line;
+  queued lines expire (1.8/2.5s), re-check `opts.valid()`, and `txt` may be a
+  function so the text describes the race when it's actually spoken.
+  Landmarks fire at the REAL track boundaries (`SEG` from S1..S3: first turn
+  ~20%, backstretch ~42%, far turn ~60%, homestretch ~82%) — the old round
+  numbers called "backstretch" mid first turn. Lead changes are called all race
+  (held ≥0.6s, spaced 2.5s / 1.2s in the stretch, owed until called) and name
+  who was passed. Short lines only (≤3 names). A pre-race line on the Race tap
+  warms up the TTS engine so "And they're off!" lands on the break.
+  Verify with the Node harness pattern: extract `const ann={` … `// ── CROWD
+  NOISE` into a vm with mocked speechSynthesis (duration ≈ words/3s + 0.35s)
+  and simplified race physics; v8.11 called 26% of lead changes, v8.12 ~73%
+  (the rest are re-passed before they can be called), median delay ~1.1s.
+- The race is 1.25 "miles" = 10 furlongs.
 
 ## Camera system (broadcast structure)
 gate head-on (2s hold) → wire cam first pass (frames whole pack, real lens
