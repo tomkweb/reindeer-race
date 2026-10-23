@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.16.0 (version string appears in exactly 4 places —
+- **Current version:** v8.17.0 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -123,6 +123,26 @@ STR=320, TR=120, CIRC≈2394m, TW=14. Oval centre (0, 160). Track runs CCW
 at the origin once and the far turn hung off the edge (the "blue band").
 Changing STR/TR requires auditing every camera position and camera.far.
 
+## Pre-race interview — Intro button (v8.17.0)
+- Title screen: 🎤 Intro (left of Start Race). The Calibrate Nose button,
+  panel and code were REMOVED (Tom: no longer needed) — `noseOff` is final.
+- NPN (North Pole News) reporter **Adam** interviews **Santa** and Rudolph's
+  jockey **Hermey** (`ELF_NAME` — the 1964 TV special's would-be dentist) on
+  the track in front of the grandstand (`INTRO_SPOT`). Santa/Adam are built
+  from primitives (`buildSanta`/`buildReporter`) at race scale (~1.7×) with
+  sRGB→linear colours (raw hex reads pastel under the sRGB output).
+- `INTRO_SCRIPT`: 7 segments × 2-7 variants (~1,000 combos), ~85-95s spoken.
+  Grinch is only a RUMOUR — never hint which race (Tom: keep it a surprise).
+- Voices: Adam en-US, Santa = race caller's en-GB male at pitch .55, Hermey
+  en-AU at pitch 1.9 — separate accents because Android has one voice per
+  locale. Captions + name supers in an HTML lower-third; a timer fallback
+  advances lines if speech is muted/unavailable.
+- Camera: TV cuts per line (wide on open/close, two-shot on questions,
+  close-up on answers) framed from the characters' real head positions;
+  camera stays ≤11m out so the inner rail isn't in the lens. Lights are
+  softened during the interview and restored after.
+- Rudolph is moved to the spot and restored on exit; tags hidden meanwhile.
+
 ## Grandstand + crowd (v8.16.0)
 - `STAND` (x0=TR+TW/2+8, 12 rows × 1.7m deep × 0.85m rise, z 6→240) along the
   OUTSIDE of the homestretch; finish line (z=0) at its near end. Banner wall
@@ -175,6 +195,7 @@ main script block with node vm before every delivery.
   (Japan Cup graphics), and a name/number lower-third at the gate
 - Closer win-rate knob: `dramaCloserWins = Math.random() < 0.80`
 - Better deer model (Rifat3D, Sketchfab, needs PC purchase)
+- Real-phone listen to the interview voices (Android accents/pitches)
 - Real-phone check of the grandstand's frame rate (~100k extra tris)
 - Sound: hoofbeats, Grinch sting still to do. Crowd noise (v8.7.0) uses
   real recordings in `audio/` — a synthesized noise crowd (v8.6.0) sounded
