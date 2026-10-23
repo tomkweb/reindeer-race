@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v8.15.0</title>
+<title>Reindeer Dash v8.16.0</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -109,7 +109,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.15.0</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.16.0</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -160,7 +160,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v8.15.0';
+const VERSION='v8.16.0';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -615,6 +615,7 @@ function init(){
   buildSnow();
   loadAllDeer();        // ← start loading models immediately
   buildOvalTrack();     // ← build track geometry after
+  buildGrandstand();
 
   document.querySelectorAll('.camBar button').forEach(b=>b.addEventListener('click',()=>{
     camMode = b.dataset.cam;
@@ -817,6 +818,146 @@ function makeTree(x, z, s){
 }
 function buildScenery(){
   // Trees removed — keep function for future scenery
+}
+
+// ── GRANDSTAND + CHEERING CROWD ─────────────────────────────────────────────
+// Stepped stand along the OUTSIDE of the homestretch (runners travel −z toward
+// the finish at z=0, so the stand ends just past the line). ~1,700 spectators
+// as 4 InstancedMeshes (body/head/arms/hats). All animation is in the vertex
+// shader — bounce, arms up, waving — driven by two shared uniforms, so it costs
+// no per-frame CPU on a phone. Excitement follows the crowd-noise level, so
+// the stand erupts exactly when the audio does.
+const STAND={x0:TR+TW/2+8, rows:12, rowD:1.7, rise:0.85, z0:6, z1:240};
+const crowdU={uT:{value:0}, uEx:{value:0}};
+// Height of the stand (incl. standing spectators) at a world x/z, 0 if outside.
+// Cameras use it to sit ABOVE the crowd instead of shooting through it.
+function standTopAt(x,z){
+  const backX=STAND.x0+STAND.rows*STAND.rowD, wallTop=STAND.rows*STAND.rise+4.8;
+  if(z<STAND.z0-2 || z>STAND.z1+2 || x<STAND.x0-1 || x>backX+1.5) return 0;
+  if(x>backX-0.3 || z<STAND.z0+0.5 || z>STAND.z1-0.5) return wallTop;   // back wall + end walls
+  const r=Math.floor((x-STAND.x0)/STAND.rowD);
+  return Math.min(STAND.rows, Math.max(1,r+1))*STAND.rise + 2.2;
+}
+// Lift a camera position just enough that its line of sight to `at` clears
+// the stand (a camera inside the stand rises above the spectators; one behind
+// it, like the telephoto on the homestretch, looks over their heads)
+function liftOverStand(from, at){
+  let need=from.y;
+  for(let i=0;i<=18;i++){
+    const t=i/20;                              // stop short of the subject itself
+    const h=standTopAt(from.x+(at.x-from.x)*t, from.z+(at.z-from.z)*t);
+    if(h) need=Math.max(need, (h+(i?0.6:1.2) - at.y*t)/(1-t));
+  }
+  from.y=need;
+}
+function crowdMaterial(color, arms){
+  const m=new THREE.MeshStandardMaterial({color, roughness:.8});
+  m.onBeforeCompile=sh=>{
+    sh.uniforms.uT=crowdU.uT; sh.uniforms.uEx=crowdU.uEx;
+    sh.vertexShader=sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float aPhase;\nuniform float uT;\nuniform float uEx;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        // bounce: everyone fidgets a little; the excited crowd jumps
+        float rate = 5.0 + aPhase*3.0;
+        float hop = max(0.0, sin(uT*rate + aPhase*40.0));
+        transformed.y += hop*hop*(0.03 + 0.32*uEx);
+        ${arms ? `
+        // arms: a growing share of the crowd throws them up as excitement rises
+        float up = clamp(uEx*1.9 - fract(aPhase*7.31), 0.0, 1.0);
+        transformed.y += mix(-0.75, 0.0, up);
+        transformed.z += sin(uT*(4.0+aPhase*2.0) + aPhase*25.0) * 0.12 * up * max(0.0, position.y);` : ''}`);
+  };
+  return m;
+}
+// Two arms in a V, merged into one non-indexed geometry
+function armsGeometry(){
+  const parts=[-1,1].map(s=>{
+    const g=new THREE.BoxGeometry(.09,.6,.09).toNonIndexed();
+    g.translate(0,.3,0); g.rotateX(s*0.45); g.translate(0,0,s*.2);
+    return g;
+  });
+  const pos=[], nor=[];
+  parts.forEach(g=>{ pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array); });
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor,3));
+  return g;
+}
+function buildGrandstand(){
+  const S=STAND, len=S.z1-S.z0, zc=(S.z0+S.z1)/2;
+  const concrete=new THREE.MeshStandardMaterial({color:0xc9c9d2, roughness:.9});
+  const seatR=new THREE.MeshStandardMaterial({color:0xb3202a, roughness:.7});
+  const seatG=new THREE.MeshStandardMaterial({color:0x1f6b34, roughness:.7});
+  // Tiers + seat strips
+  for(let r=0;r<S.rows;r++){
+    const h=(r+1)*S.rise;
+    const tier=new THREE.Mesh(new THREE.BoxGeometry(S.rowD, h, len), concrete);
+    tier.position.set(S.x0 + r*S.rowD + S.rowD/2, h/2, zc);
+    scene.add(tier);
+    const seat=new THREE.Mesh(new THREE.BoxGeometry(S.rowD*.45, .14, len), r%2?seatG:seatR);
+    seat.position.set(S.x0 + r*S.rowD + S.rowD*.72, h+.07, zc);
+    scene.add(seat);
+  }
+  // Back wall with a festive banner above the top row, plus end walls
+  const topH=S.rows*S.rise, wallH=topH+4.5, backX=S.x0+S.rows*S.rowD;
+  const wall=new THREE.Mesh(new THREE.BoxGeometry(.6, wallH, len+.6), concrete);
+  wall.position.set(backX+.3, wallH/2, zc); scene.add(wall);
+  const cv=document.createElement('canvas'); cv.width=1024; cv.height=128;
+  const c=cv.getContext('2d');
+  c.fillStyle='#b3202a'; c.fillRect(0,0,1024,128);
+  c.fillStyle='#ffffff'; c.font='bold 72px sans-serif'; c.textAlign='center'; c.textBaseline='middle';
+  c.fillText('★  THE REINDEER DASH  ★', 512, 68);
+  const tex=new THREE.CanvasTexture(cv);
+  tex.wrapS=THREE.RepeatWrapping; tex.repeat.set(Math.round(len/45),1);
+  const ban=new THREE.Mesh(new THREE.PlaneGeometry(len,3.2), new THREE.MeshBasicMaterial({map:tex}));
+  ban.rotation.y=-Math.PI/2;                 // face the track (−x)
+  ban.position.set(backX-.02, topH+2.6, zc); scene.add(ban);
+  [S.z0-.3, S.z1+.3].forEach(z=>{
+    const end=new THREE.Mesh(new THREE.BoxGeometry(S.rows*S.rowD+.6, wallH, .6), concrete);
+    end.position.set(S.x0+S.rows*S.rowD/2, wallH/2, z); scene.add(end);
+  });
+  // Spectators
+  const people=[];
+  for(let r=0;r<S.rows;r++){
+    for(let z=S.z0+.8; z<S.z1-.6; z+=1.15){
+      if(Math.random()>0.8) continue;        // a few empty seats
+      people.push({x:S.x0 + r*S.rowD + S.rowD*.42 + (Math.random()-.5)*.25,
+                   y:(r+1)*S.rise, z:z+(Math.random()-.5)*.35, ph:Math.random()});
+    }
+  }
+  const SHIRTS=[0xc62828,0x2e7d32,0xf5f5f5,0x1565c0,0xf9a825,0x6a1b9a,0xd84315,0x00838f];
+  const SKIN=[0xf1c27d,0xe0ac69,0xc68642,0x8d5524,0xffdbac];
+  const hatted=people.filter(()=>Math.random()<0.35);
+  const parts=[
+    {geo:new THREE.CylinderGeometry(.2,.27,.9,6,1,true), dy:.45, list:people, col:()=>pick(SHIRTS)},
+    {geo:new THREE.IcosahedronGeometry(.17,0),           dy:1.06, list:people, col:()=>pick(SKIN)},
+    {geo:armsGeometry(),                                  dy:1.0, list:people, col:()=>pick(SHIRTS), arms:true},
+    {geo:new THREE.ConeGeometry(.18,.34,6),               dy:1.33, list:hatted, col:()=>0xc62828}
+  ];
+  const m4=new THREE.Matrix4(), col=new THREE.Color();
+  parts.forEach(p=>{
+    const n=p.list.length;
+    const geo=p.geo.clone();
+    const ph=new Float32Array(n);
+    const mesh=new THREE.InstancedMesh(geo, crowdMaterial(0xffffff, !!p.arms), n);
+    p.list.forEach((q,i)=>{
+      m4.makeTranslation(q.x, q.y+p.dy, q.z);
+      mesh.setMatrixAt(i, m4);
+      mesh.setColorAt(i, col.setHex(p.col()));
+      ph[i]=q.ph;
+    });
+    geo.setAttribute('aPhase', new THREE.InstancedBufferAttribute(ph,1));
+    mesh.instanceMatrix.needsUpdate=true;
+    if(mesh.instanceColor) mesh.instanceColor.needsUpdate=true;
+    mesh.frustumCulled=false;                // instances span 230m; base bounds don't
+    scene.add(mesh);
+  });
+}
+function updateStandCrowd(dt){
+  crowdU.uT.value += dt;
+  // Excitement tracks the crowd-noise level (0 until the first Race tap)
+  const target=Math.min(1, Math.max(0.05, crowd.level*1.25));
+  crowdU.uEx.value += (target-crowdU.uEx.value)*Math.min(1, dt*3);
 }
 
 // ── STARTING GATE ─────────────────────────────────────────────────────────────
@@ -1971,6 +2112,7 @@ function directCamera(dt){
       const cx=(pk.x+w.group.position.x)/2, cz=(pk.z+w.group.position.z)/2;
       const angle = winnerCamTimer * 0.45;
       const tp = new THREE.Vector3(cx + Math.sin(angle)*24, 7, cz + Math.cos(angle)*24);
+      liftOverStand(tp, new THREE.Vector3(cx,2,cz));  // orbit swings over the stand, not through it
       const a = 1-Math.exp(-3*dt);
       camPos.lerp(tp,a); camAim.lerp(new THREE.Vector3(cx,2,cz),a);
       camera.position.copy(camPos); camera.lookAt(camAim);
@@ -2134,8 +2276,13 @@ function directCamera(dt){
       // Camera rides OUTSIDE the track, 150m off the rail, shooting inward: the
       // old spot sat in the infield, so the (7-14m) infield trees blocked the
       // now-tight lens; from outside they're backdrop behind the field
-      const cp=trackPos(g.p, TW/2 + 150);
-      tp.set(cp.x, 6, cp.z);
+      let cp=trackPos(g.p, TW/2 + 150), camY=6;
+      // …except where the grandstand would be in the way (homestretch): there
+      // it shoots from the infield side, raised over the trees, so the cheering
+      // crowd becomes the backdrop behind the field instead of a wall in front
+      for(let i=1;i<10;i++){ const t=i/10;
+        if(standTopAt(cp.x+(g.x-cp.x)*t, cp.z+(g.z-cp.z)*t)){ cp=trackPos(g.p, -(TW/2+150)); camY=25; break; } }
+      tp.set(cp.x, camY, cp.z);
       ta.set(g.x, 2, g.z);
       targetFov=fitFov(tp, ta, g.pts, 1.2);          // long lens filled with the bunch
     }
@@ -2205,6 +2352,9 @@ function directCamera(dt){
   // runners allow — widen the lens (never narrow it) until all three fit.
   if(FIT_TOP3.has(mode)) targetFov=Math.max(targetFov, fitTop3Fov(tp, ta));
 
+  // Never shoot through the grandstand (see liftOverStand)
+  liftOverStand(tp, ta);
+
   const a=1-Math.exp(-sm*dt);
   camPos.lerp(tp,a); camAim.lerp(ta,a);
   if(!isFinite(camPos.x)||!isFinite(camPos.y)||!isFinite(camPos.z)){ camPos.copy(tp); }
@@ -2256,7 +2406,7 @@ function showResults(){
   if(rb) rb.addEventListener('click', startReplay);
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.15.0</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.16.0</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
@@ -2355,6 +2505,7 @@ function animate(){
   updateSparkles(rawDt);
   updateSnow(rawDt);
   crowdUpdate();
+  updateStandCrowd(rawDt);
   if(replayActive){ updateReplay(rawDt); renderer.render(scene, camera); return; }
   if(paused && racing){ renderer.render(scene, camera); return; }
   if(racing) updateRace(dt);

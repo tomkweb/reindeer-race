@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.15.0 (version string appears in exactly 4 places —
+- **Current version:** v8.16.0 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -123,6 +123,25 @@ STR=320, TR=120, CIRC≈2394m, TW=14. Oval centre (0, 160). Track runs CCW
 at the origin once and the far turn hung off the edge (the "blue band").
 Changing STR/TR requires auditing every camera position and camera.far.
 
+## Grandstand + crowd (v8.16.0)
+- `STAND` (x0=TR+TW/2+8, 12 rows × 1.7m deep × 0.85m rise, z 6→240) along the
+  OUTSIDE of the homestretch; finish line (z=0) at its near end. Banner wall
+  "★ THE REINDEER DASH ★" above the top row.
+- ~1,700 spectators = 4 InstancedMeshes (body/head/arms/Santa hats on ~35%),
+  per-instance colour, `frustumCulled=false` (instances span 230m; base
+  bounds would cull them). ALL animation is in the vertex shader
+  (`crowdMaterial` onBeforeCompile, per-instance `aPhase`) driven by
+  `crowdU.uT/uEx`; `uEx` follows `crowd.level`, so the stand erupts with the
+  audio. ~100k tris, 4 draw calls, no per-frame CPU. No shadows on the crowd.
+- Cameras: `liftOverStand(tp,ta)` raises any camera whose line of sight
+  crosses the stand (`standTopAt` incl. the taller back/end walls) — applied
+  to every directed shot and the winner orbit. Telephoto on the homestretch
+  switches to the INFIELD side at 25m (over the 7-14m trees) so the crowd is
+  backdrop, not a wall in front.
+- Headless note: the blimp view crashes headless SwiftShader ("Abnormal
+  renderer termination") — pre-existing, not the crowd. Use a fixed-vantage
+  `__VIEW` override in the test page to inspect the stand.
+
 ## Three.js r128 gotchas
 - 9 cache-busted model loads (`scene.gltf?n=0..8`) or all deer share one
   skeleton; SkeletonUtils.clone per deer
@@ -156,6 +175,7 @@ main script block with node vm before every delivery.
   (Japan Cup graphics), and a name/number lower-third at the gate
 - Closer win-rate knob: `dramaCloserWins = Math.random() < 0.80`
 - Better deer model (Rifat3D, Sketchfab, needs PC purchase)
+- Real-phone check of the grandstand's frame rate (~100k extra tris)
 - Sound: hoofbeats, Grinch sting still to do. Crowd noise (v8.7.0) uses
   real recordings in `audio/` — a synthesized noise crowd (v8.6.0) sounded
   like static and was dropped. Two loops (`bed` ambience, `excited` chatter)
