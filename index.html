@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v8.17.2</title>
+<title>Reindeer Dash v8.18.0</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -109,7 +109,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.17.2</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.18.0</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -161,7 +161,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v8.17.2';
+const VERSION='v8.18.0';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -362,6 +362,7 @@ function announcerUpdate(){
   if(!F.back && frac>=SEG.back){ F.back=true;
     if(say(()=>{ const o=topN(2), ld=o[0]; return pick([`Down the backstretch, ${ld.name} in front!`,
       `They straighten up on the back side, ${ld.name} leads ${o[1].name}!`]); },L3)) named(); }
+  if(!raceStats.far && frac>=SEG.far) raceStats.far=topN(9);   // running order at the far turn
   if(!F.far && frac>=SEG.far){ F.far=true;
     if(say(()=>{ const o=topN(2), ld=o[0]; return pick([`Into the far turn, ${ld.name} leads, four furlongs to run!`,
       `Around the far turn they go, ${ld.name} still in front!`]); },L3)) named(); }
@@ -507,7 +508,7 @@ function crowdUpdate(){
     const b=Math.max(0,Math.min(1,(frac-0.62)/0.33));
     tgt = finishCounter>0 ? 0.6 : 0.28+0.47*b*b*(3-2*b);
     tgt = Math.max(tgt, 0.8-0.12*raceTime);   // gates-open roar carries ~4s, then settles
-  } else tgt=0.12;   // results / title screen
+  } else tgt = intro.active ? 0.04 : 0.12;   // interview: crowd way down so voices cut through / results & title
   if(!preRace) crowd.preT=0;
   crowd.level += (tgt-crowd.level)*Math.min(1, dt*(tgt>crowd.level?2.0:0.6));
   const t=crowd.ctx.currentTime, L=crowd.level;
@@ -517,9 +518,11 @@ function crowdUpdate(){
   let m=(ann.on && crowd.started)?CROWD_VOL:0, ms=m;
   const noDuck = racing && raceTime<3.5;   // let the break roar over "And they're off!"
   try{ if(m && !noDuck && window.speechSynthesis && speechSynthesis.speaking){ m*=CROWD_DUCK; ms*=SHOT_DUCK; } }catch(e){}
+  if(intro.active){ ms*=0.4; }                // interview cheers stay under the voices
   crowd.out.gain.setTargetAtTime(m, t, 0.25);
   crowd.shotBus.gain.setTargetAtTime(ms, t, 0.1);
 }
+let raceStats={};      // facts the winner's interview talks about (margin, far-turn order…)
 let dramaCloser=null;  // the designated come-from-behind runner this race
 let dramaCloserWins=true; // ~80% of races the charge gets there; sometimes a nose short
 let raceCount=0, grinchRace=false;  // every 3rd race the Grinch steals it
@@ -1127,27 +1130,32 @@ function makeElf(coatColor){
   belt.position.y=-.18; g.add(belt);
   const buckle=new THREE.Mesh(new THREE.BoxGeometry(.07,.05,.01),gold);
   buckle.position.set(0,-.18,.18); g.add(buckle);
-  // Head + face
+  // Head + face — in their own group so a jockey can turn his head (interviews)
+  const hg=new THREE.Group(); g.add(hg); g.userData.head=hg;
   const head=new THREE.Mesh(new THREE.SphereGeometry(.13,12,10),skin);
-  head.position.y=.32; head.castShadow=true; g.add(head);
+  head.position.y=.32; head.castShadow=true; hg.add(head);
   [-0.045,0.045].forEach(x=>{
     const e=new THREE.Mesh(new THREE.SphereGeometry(.018,6,6),dark);
-    e.position.set(x,.34,.115); g.add(e);
+    e.position.set(x,.34,.115); hg.add(e);
   });
   const noseMesh=new THREE.Mesh(new THREE.SphereGeometry(.022,6,6),skin);
   noseMesh.position.set(0,.31,.125);
-  g.add(noseMesh);
+  hg.add(noseMesh);
+  // Smile — half a torus, curving down
+  const mouth=new THREE.Mesh(new THREE.TorusGeometry(.035,.009,5,10,Math.PI),
+    new THREE.MeshStandardMaterial({color:0x7a2a1a}));
+  mouth.position.set(0,.285,.118); mouth.rotation.z=Math.PI; hg.add(mouth);
   [-1,1].forEach(s=>{
     const ear=new THREE.Mesh(new THREE.ConeGeometry(.035,.12,5),skin);
-    ear.position.set(s*.13,.34,-.01); ear.rotation.z=s*Math.PI/2.2; g.add(ear);
+    ear.position.set(s*.13,.34,-.01); ear.rotation.z=s*Math.PI/2.2; hg.add(ear);
   });
   // Hat
   const hat=new THREE.Mesh(new THREE.ConeGeometry(.15,.4,12),coat);
-  hat.position.y=.65; hat.rotation.x=-.18; hat.castShadow=true; g.add(hat);
+  hat.position.y=.65; hat.rotation.x=-.18; hat.castShadow=true; hg.add(hat);
   const band=new THREE.Mesh(new THREE.CylinderGeometry(.15,.15,.05,12),white);
-  band.position.y=.47; g.add(band);
+  band.position.y=.47; hg.add(band);
   const pom=new THREE.Mesh(new THREE.SphereGeometry(.055,8,8),white);
-  pom.position.set(.06,.86,.06); g.add(pom);
+  pom.position.set(.06,.86,.06); hg.add(pom);
   // Arms
   [-1,1].forEach(s=>{
     const pv=new THREE.Group();
@@ -1158,15 +1166,15 @@ function makeElf(coatColor){
     const hand=new THREE.Mesh(new THREE.SphereGeometry(.045,8,8),skin);
     hand.position.set(s*.16,-.05,.28); g.add(hand);
   });
-  // Legs
+  // Legs — riding position: thighs spread out over the reindeer's back, shins
+  // hanging down its sides, boots in the stirrups
   [-1,1].forEach(s=>{
-    const lp=new THREE.Group();
-    lp.position.set(s*.12,-.22,0);
-    const leg=new THREE.Mesh(new THREE.CylinderGeometry(.055,.05,.35,7),pants);
-    leg.position.y=-.175; leg.castShadow=true; lp.add(leg);
-    lp.rotation.z=s*.45; g.add(lp);
-    const b=new THREE.Mesh(new THREE.BoxGeometry(.09,.06,.14),boot);
-    b.position.set(s*.30,-.55,.02); g.add(b);
+    const thigh=new THREE.Mesh(new THREE.CylinderGeometry(.055,.05,.26,7),pants);
+    thigh.position.set(s*.25,-.25,.04); thigh.rotation.z=s*1.25; thigh.castShadow=true; g.add(thigh);
+    const shin=new THREE.Mesh(new THREE.CylinderGeometry(.05,.045,.26,7),pants);
+    shin.position.set(s*.37,-.4,.06); shin.rotation.z=s*.15; shin.castShadow=true; g.add(shin);
+    const b=new THREE.Mesh(new THREE.BoxGeometry(.09,.07,.15),boot);
+    b.position.set(s*.39,-.54,.09); g.add(b);
   });
   return g;
 }
@@ -1221,8 +1229,11 @@ function setupDeer(deerScene, runClip, idleClip, idx){
   // Rudolph's nose
   let headNode=null, noseGroup=null;
   if(idx===8){
+    // Santa-suit red. sRGB→linear, and a modest glow — the old 2.5× emissive on
+    // raw hex blew out to pink under the sRGB output
+    const noseRed=new THREE.Color(0xc8102e).convertSRGBToLinear();
     const nm=new THREE.MeshStandardMaterial(
-      {color:0xff2233,emissive:0xff1122,emissiveIntensity:2.5,roughness:.2});
+      {color:noseRed,emissive:noseRed,emissiveIntensity:1.1,roughness:.25});
     noseGroup=new THREE.Group();
     noseGroup.add(new THREE.Mesh(new THREE.SphereGeometry(.14,14,14),nm));
     scene.add(noseGroup);
@@ -1283,6 +1294,7 @@ function setupDeer(deerScene, runClip, idleClip, idx){
 
 // ── RACE SETUP ────────────────────────────────────────────────────────────────
 function configureRace(){
+  raceStats={};
   raceTime=0; finishCounter=0; finishedAll=false; postTimer=0;
   paused=false; if(typeof pauseBtn!=='undefined') pauseBtn.textContent='⏸';
   winnerCamActive=false; winnerCamTimer=0; preRace=false;
@@ -1539,6 +1551,7 @@ function updateGrinch(dt){
     grinch.progress += grinch.speed*dt/CIRC;
     if(grinch.progress>=P_FINISH && !grinch.finished){
       grinch.finished=true; grinch.place=++finishCounter;
+      if(grinch.place===1) recordWinner(grinch);
       photoQueue.push(grinch);
     }
   } else if(grinch.finished){
@@ -2044,6 +2057,7 @@ function updateRace(dt){
     // Finish — keep position/movement, just flag and start crossfade
     if(d.progress>=P_FINISH && !d.finished){
       d.finished=true; d.place=++finishCounter;
+      if(d.place===1) recordWinner(d);
       d.group.position.y=0; d.flightProg=-1;
       d.idleAct.reset().play(); d.action.crossFadeTo(d.idleAct, 1.5, false);
       photoQueue.push(d); // capture AFTER all tracking completes this frame
@@ -2400,15 +2414,17 @@ function showResults(){
     <div class="credit">Model: "Deer Animation" by DarryleH · CC-BY-4.0 · sketchfab.com · Crowd audio: Gregor Quendel · CC-BY-4.0 · ${VERSION}</div>
     <div style="margin-top:1.1rem">
       ${replayFrames.length>1?'<button class="bigBtn" id="replayBtn" style="display:block;margin-bottom:.7rem;background:linear-gradient(180deg,#7cc4f0,#3f8fc4);box-shadow:0 6px 0 #1d5a85">📺 Instant Replay</button>':''}
+      <button class="bigBtn" id="winIntBtn" style="display:block;margin-bottom:.7rem;background:linear-gradient(180deg,#f4c95d,#d9a233);box-shadow:0 6px 0 #8a5a12">🎤 Winner Interview</button>
       <button class="bigBtn" id="again" style="display:block">Race Again</button>
     </div>
   </div></div>`;
   overlay.classList.remove('off');
   const rb=document.getElementById('replayBtn');
   if(rb) rb.addEventListener('click', startReplay);
+  document.getElementById('winIntBtn').addEventListener('click', ()=>startShow('win'));
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.17.2</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.18.0</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
@@ -2504,10 +2520,15 @@ function updateCalCamera(){
 // only offers one voice per accent, so they're split across US / UK / AU
 // English (plus pitch/rate) to sound like three different people.
 const ELF_NAME='Hermey';   // Rudolph's jockey — the 1964 TV special's would-be dentist
-const INTRO_SPOT={x:124, z:60};   // on the track, outside lane — stand + crowd behind
+// Jockeys, in NAMES order. Hermey is canon (Rudolph's pal); the next six are
+// the elves of popular Christmas lore; the last two are our own.
+const JOCKEYS=['Pepper Minstix','Sugarplum Mary','Shinny Upatree','Alabaster Snowball',
+  'Wunorse Openslae','Bushy Evergreen','Jingle Jangleton','Tinsel Twinkletoes',ELF_NAME];
+const INTRO_SPOT={x:124, z:60};   // pre-race: on the track, outside lane — stand + crowd behind
+const WIN_SPOT={x:124, z:24};     // winner's circle, just up the stretch from the finish line
 const intro={active:false, lines:[], i:-1, lineT:0, waitT:0, speaking:false, santa:null, adam:null,
   saved:null, voices:{}, timer:null, camZ:0, shot:null, push:0};
-const S='santa', A='adam', E='elf';
+const S='santa', A='adam', E='elf', G='grinch';
 const INTRO_SCRIPT=[
   // opening
   [[ [A,`Good evening, and welcome to North Pole News! I'm Adam, live at the Reindeer Dash, and this crowd is buzzing!`],
@@ -2566,6 +2587,76 @@ const INTRO_SCRIPT=[
    [ [A,`Thanks, Santa, and good luck, ${ELF_NAME}! That's all from trackside. I'm Adam, North Pole News. Let's go racing!`],
      [S,`Ho ho ho! Let's go racing!`] ]]
 ];
+const ordinal=n=>n+(['th','st','nd','rd'][(n%100-20)%10]||['th','st','nd','rd'][n%100]||'th');
+function buildWinnerScript(w){
+  if(w===grinch) return pick([
+    [[A,`Well, folks, this is awkward. The Grinch has won the Reindeer Dash.`],
+     [A,`Grinch, how did you pull this off?`],
+     [G,`Pull it off? I simply borrowed the lead. Heh heh heh.`],
+     [A,`You weren't even entered in the race!`],
+     [G,`Details! Rules are for reindeer.`],
+     [A,`Santa, your reaction?`],
+     [S,`Ho ho, no. Somebody check his pockets.`],
+     [G,`Too late! The Golden Carrot is mine! Mwah ha ha!`],
+     [A,`And there he goes. From a very confused winner's circle, I'm Adam, North Pole News.`]],
+    [[A,`I'm in the winner's circle with, uh, the Grinch, who dropped out of the sky and won the Reindeer Dash.`],
+     [A,`Grinch, what was your strategy?`],
+     [G,`Strategy? Wait until they're tired, then fall on them from forty feet. Heh heh heh.`],
+     [A,`Is it true you don't even like racing?`],
+     [G,`I hate racing. I hate cheering. But I love winning!`],
+     [S,`Ho ho, oh dear. I'll be checking my list twice about this one.`],
+     [A,`From trackside, where the stewards are, quote, looking into it, I'm Adam, North Pole News.`]]
+  ]);
+  const di=deerObjs.indexOf(w), D=w.name, J=JOCKEYS[di], Jf=J.split(' ')[0];
+  const order=[...deerObjs].filter(Boolean).sort((a,b)=>a.place-b.place);
+  const second=order.find(d=>d.place===2) || order[1];
+  const D2=second?second.name:'the field', J2=second?JOCKEYS[deerObjs.indexOf(second)]:'everyone';
+  const L=raceStats.margin||1;
+  const farRank=raceStats.far ? raceStats.far.indexOf(w)+1 : 1;
+  const L_TXT = L<0.15?'a nose':L<0.35?'a head':L<0.6?'a neck':L<0.9?'half a length':L<1.5?'a length':`${Math.round(L)} lengths`;
+  const lines=[];
+  lines.push(...pick([
+    [[A,`Adam here in the winner's circle with ${J}, who just rode ${D} to victory in the Reindeer Dash!`],
+     [E,pick([`Woo-hoo! We did it!`,`Is this real? Somebody pinch me!`])]],
+    [[A,`What a race! I'm standing next to the winner, ${D}, and jockey ${J}. Congratulations!`],
+     [E,`Thank you, Adam! And look, my hat is still on!`]]
+  ]));
+  lines.push([A,pick([`${Jf}, how does it feel?`,`${Jf}, describe that feeling for us.`])],
+    [E,pick([`Like Christmas morning, times ten!`,`My knees are still shaking! But in a good way!`,
+      `Better than finding the last candy cane on the tree!`])]);
+  // The story of THIS race
+  let story;
+  if(L<0.6) story=[[A,`That was a photo finish, by ${L_TXT}! Did you know you'd won?`],
+    [E, D==='Rudolph' ? `Not a clue! Good thing that nose glows, the camera couldn't miss it!`
+                      : `No idea! I closed my eyes at the wire and hoped ${D}'s nose was out front!`]];
+  else if(farRank>=4) story=[[A,`You were ${ordinal(farRank)} at the far turn! When did you know you could win?`],
+    [E,`When we turned for home, I whispered, now, ${D}, now! And ${D} just took off!`]];
+  else if(L>=4) story=[[A,`You won by ${L_TXT}! Was it as easy as it looked?`],
+    [E,`${D} did all the work. I just held on and enjoyed the view!`]];
+  else story=[[A,`${D2} pushed you all the way. What was it like down the stretch?`],
+    [E,`Nose to nose! I could hear ${J2} yelling the whole way!`]];
+  lines.push(...story);
+  if(L>=0.6 && second) lines.push([A,`What would you say to ${J2}, who rode ${D2} into second?`],
+    [E,pick([`Great ride, ${J2.split(' ')[0]}! I owe you a hot cocoa!`,`Next time, ${J2.split(' ')[0]}! Maybe.`])]);
+  lines.push(...pick([
+    [[A,`How are you going to celebrate?`],[E,`Hot cocoa with extra marshmallows, then a long nap in the hay!`]],
+    [[A,`What did ${D} have for breakfast this morning?`],[E,`Oats, carrots, and a secret sprinkle of North Pole magic. Don't tell the other jockeys!`]],
+    [[A,`Any message for the folks at home?`],[E,`Hi, Mom! I told you I'd win one day!`]]
+  ]));
+  lines.push([S, D==='Rudolph' ? `Ho ho ho! That's my boy! Congratulations, ${Jf}! The Golden Carrot goes to Rudolph!`
+                               : `Ho ho ho! Congratulations, ${Jf}! The Golden Carrot goes to ${D}!`],
+    [E,`Thank you, Santa!`],
+    [A,pick([`From the winner's circle at the Reindeer Dash, I'm Adam, North Pole News. Back to you!`,
+      `What a day for ${D}! I'm Adam, North Pole News, signing off from the winner's circle.`])]);
+  return lines;
+}
+function recordWinner(w){
+  // Winning margin: how far back the next runner was when the winner hit the line
+  let best=-1e9;
+  deerObjs.forEach(o=>{ if(o && o!==w) best=Math.max(best,o.progress); });
+  if(w!==grinch && grinch && grinch.landed && !grinch.finished) best=Math.max(best,grinch.progress);
+  raceStats.margin=Math.max(0,(w.progress-best)*CIRC/2.5);
+}
 const INTRO_SUPERS={adam:['ADAM','North Pole News · Trackside'], santa:['SANTA CLAUS','Owner · Rudolph'],
   elf:[ELF_NAME.toUpperCase(),'Jockey · Rudolph']};
 
@@ -2609,6 +2700,17 @@ function buildSanta(){
   const pom=new THREE.Mesh(new THREE.SphereGeometry(.07,8,8),white); pom.position.set(0,.55,-.25); head.add(pom);
   g.userData={belly, head};
   g.scale.setScalar(1.75); g.visible=false; scene.add(g);
+  // The Golden Carrot trophy — gold carrot on a little plinth
+  const carrot=new THREE.Group();
+  // No environment map in this scene, so real metal renders near-black — fake the shine with a warm glow
+  const goldC=new THREE.Color(0xf2c230).convertSRGBToLinear();
+  const goldT=new THREE.MeshStandardMaterial({color:goldC,emissive:goldC,emissiveIntensity:.35,roughness:.3,metalness:.1});
+  const body=new THREE.Mesh(new THREE.ConeGeometry(.16,.85,12),goldT); body.rotation.x=Math.PI; body.position.y=.55; carrot.add(body);
+  [-0.06,0,0.06].forEach((x,i)=>{ const leaf=new THREE.Mesh(new THREE.ConeGeometry(.05,.32,6),
+      new THREE.MeshStandardMaterial({color:new THREE.Color(0x2e9e44).convertSRGBToLinear()}));
+    leaf.position.set(x,1.1,0); leaf.rotation.z=(i-1)*0.35; carrot.add(leaf); });
+  const plinth=new THREE.Mesh(new THREE.CylinderGeometry(.14,.17,.12,12),goldT); plinth.position.y=.06; carrot.add(plinth);
+  carrot.visible=false; scene.add(carrot); intro.carrot=carrot;
   return g;
 }
 function buildReporter(){
@@ -2629,7 +2731,7 @@ function buildReporter(){
   const arm=new THREE.Group(); arm.position.set(.29,1.52,0); g.add(arm);
   const sleeve=new THREE.Mesh(new THREE.CylinderGeometry(.065,.07,.55,8),suit); sleeve.position.y=-.27; arm.add(sleeve);
   const hand=new THREE.Mesh(new THREE.SphereGeometry(.06,8,8),skin); hand.position.y=-.57; arm.add(hand);
-  const mic=new THREE.Group(); mic.position.y=-.6; arm.add(mic);
+  const mic=new THREE.Group(); mic.position.y=-.6; mic.rotation.x=Math.PI; arm.add(mic);   // ball points out along the arm
   const handle=new THREE.Mesh(new THREE.CylinderGeometry(.025,.03,.28,8),M(0x111111,.4)); handle.position.y=.06; mic.add(handle);
   const ball=new THREE.Mesh(new THREE.SphereGeometry(.055,10,8),M(0x777777,.9)); ball.position.y=.23; mic.add(ball);
   const cv=document.createElement('canvas'); cv.width=128; cv.height=64;
@@ -2662,8 +2764,10 @@ function introPickVoices(){
     santa: ann.voice || male(gb,[/Male/i]) || gb[0] || null,     // the race caller's British male, pitched way down
     elf: au[0] || byLang(/en[-_](IE|IN|NZ|ZA)/i)[0] || null
   };
+  intro.voices.grinch=intro.voices.adam;            // US voice, pitched down to a sneer
 }
-const INTRO_STYLE={adam:{pitch:.95, rate:1.08}, santa:{pitch:.55, rate:.86}, elf:{pitch:1.9, rate:1.18}};
+const INTRO_STYLE={adam:{pitch:.95, rate:1.08}, santa:{pitch:.68, rate:.88}, elf:{pitch:1.8, rate:1.15},
+  grinch:{pitch:.6, rate:.95}};  // pitch extremes sound quieter on phone speakers
 function introSpeak(who, text, done){
   clearTimeout(intro.timer);
   const words=text.split(/\s+/).length;
@@ -2675,7 +2779,7 @@ function introSpeak(who, text, done){
     speechSynthesis.cancel();
     const u=new SpeechSynthesisUtterance(text);
     const v=intro.voices[who];
-    if(v){ u.voice=v; u.lang=v.lang; } else u.lang=(who==='elf'?'en-AU':who==='adam'?'en-US':'en-GB');
+    if(v){ u.voice=v; u.lang=v.lang; } else u.lang=(who==='elf'?'en-AU':who==='santa'?'en-GB':'en-US');
     u.pitch=INTRO_STYLE[who].pitch; u.rate=INTRO_STYLE[who].rate; u.volume=1;
     u.onend=()=>{ clearTimeout(intro.timer); intro.timer=setTimeout(done, 380); };
     speechSynthesis.speak(u);
@@ -2690,8 +2794,11 @@ function buildIntroHud(){
       padding:5px 10px;border-radius:6px;color:#fff;font-weight:700;letter-spacing:.06em;font-size:.85rem">
       <span style="background:#c8102e;padding:2px 7px;border-radius:3px">NPN</span> NORTH POLE NEWS
       <span id="ihLive" style="color:#ff4d4d">● LIVE</span></div>
-    <button id="ihSkip" style="pointer-events:auto;position:fixed;top:12px;right:14px;font-family:Fredoka,sans-serif;
-      font-weight:700;border:none;background:rgba(255,255,255,.9);color:#1a1340;padding:.45rem 1.1rem;border-radius:999px;cursor:pointer">Skip ⏭</button>
+    <div style="pointer-events:auto;position:fixed;top:12px;right:14px;display:flex;gap:8px">
+      <button id="ihPause" style="font-family:Fredoka,sans-serif;font-weight:700;border:none;background:rgba(255,255,255,.9);
+        color:#1a1340;padding:.45rem 1.1rem;border-radius:999px;cursor:pointer">⏸ Pause</button>
+      <button id="ihSkip" style="font-family:Fredoka,sans-serif;font-weight:700;border:none;background:rgba(255,255,255,.9);
+        color:#1a1340;padding:.45rem 1.1rem;border-radius:999px;cursor:pointer">Skip ⏭</button></div>
     <div style="position:fixed;left:0;right:0;bottom:0;padding:0 14px 14px">
       <div id="ihSuper" style="display:inline-block;margin-bottom:6px;background:#fff;border-left:6px solid #c8102e;
         padding:4px 12px;border-radius:3px;opacity:0;transition:opacity .3s">
@@ -2700,38 +2807,68 @@ function buildIntroHud(){
       <div id="ihCap" style="background:rgba(10,14,35,.82);color:#fff;font-size:clamp(1rem,2.6vw,1.45rem);
         line-height:1.35;padding:10px 14px;border-radius:8px;min-height:2.6em"></div>
       <div style="margin-top:6px;background:#c8102e;color:#fff;font-weight:700;font-size:.8rem;padding:4px 10px;
-        border-radius:3px;white-space:nowrap;overflow:hidden">LIVE FROM THE REINDEER DASH · SANTA &amp; ${ELF_NAME.toUpperCase()} TALK RUDOLPH'S CHANCES · POST TIME COMING UP</div>
+        border-radius:3px;white-space:nowrap;overflow:hidden" id="ihTicker"></div>
     </div>`;
   document.body.appendChild(introHud);
   introHud.querySelector('#ihSkip').addEventListener('click', endIntro);
+  introHud.querySelector('#ihPause').addEventListener('click', toggleIntroPause);
 }
-function startIntro(){
-  const rud=deerObjs[8]; if(!rud) return;
-  crowdInit();                         // user gesture: wakes the crowd audio (low murmur)
+function startIntro(){ startShow('pre'); }
+// kind 'pre': Santa + Rudolph & Hermey before the races.
+// kind 'win': the winner's circle — the winning jockey on their reindeer (or
+// the Grinch, if he stole it), Santa with the Golden Carrot.
+function startShow(kind){
+  const star = kind==='pre' ? deerObjs[8] : raceWinner();
+  if(!star) return;
+  crowdInit();                         // user gesture: wakes the crowd audio
   if(!intro.santa){ intro.santa=buildSanta(); intro.adam=buildReporter(); buildIntroHud(); }
   introPickVoices();
-  // Assemble today's script: one variant of every segment
-  intro.lines=[]; INTRO_SCRIPT.forEach(seg=>intro.lines.push(...pick(seg)));
-  // Stage: reporter, Santa, then Rudolph side-on with his jockey up
-  intro.saved={p:rud.group.position.clone(), r:rud.group.rotation.y};
-  const X=INTRO_SPOT.x, Z=INTRO_SPOT.z;
-  intro.adam.position.set(X,0,Z-2.2);  intro.adam.rotation.y=-Math.PI/2+0.55;
-  intro.santa.position.set(X,0,Z);      intro.santa.rotation.y=-Math.PI/2-0.35;
-  rud.group.position.set(X+0.6,0,Z+4.4); rud.group.rotation.y=Math.PI;   // facing −z, head toward Santa
+  intro.kind=kind; intro.star=star;
+  const isGrinch = star===grinch;
+  const di = isGrinch ? -1 : deerObjs.indexOf(star);
+  if(kind==='pre'){
+    intro.lines=[]; INTRO_SCRIPT.forEach(seg=>intro.lines.push(...pick(seg)));
+    intro.supers=INTRO_SUPERS;
+    intro.ticker=`LIVE FROM THE REINDEER DASH · SANTA & ${ELF_NAME.toUpperCase()} TALK RUDOLPH'S CHANCES · POST TIME COMING UP`;
+  } else {
+    intro.lines=buildWinnerScript(star);
+    intro.supers={adam:['ADAM','North Pole News · Winner\'s Circle'], santa:['SANTA CLAUS','Presenting the Golden Carrot'],
+      elf: isGrinch ? ['',''] : [JOCKEYS[di].toUpperCase(), `Winning jockey · ${star.name}`],
+      grinch:['THE GRINCH','Winner?! · Not entered']};
+    intro.ticker = isGrinch ? 'BREAKING: GRINCH STEALS THE REINDEER DASH · STEWARDS "LOOKING INTO IT" · CHECK YOUR POCKETS'
+      : `${star.name.toUpperCase()} WINS THE REINDEER DASH · RIDDEN BY ${JOCKEYS[di].toUpperCase()} · GOLDEN CARROT PRESENTED BY SANTA`;
+  }
+  // Each jockey gets their own squeak
+  INTRO_STYLE.elf.pitch = kind==='pre' || di===8 ? 1.8 : 1.55 + (di%4)*0.1;
+  intro.spot = kind==='pre' ? INTRO_SPOT : WIN_SPOT;
+  const X=intro.spot.x, Z=intro.spot.z;
+  intro.saved={p:star.group.position.clone(), r:star.group.rotation.y, v:star.group.visible};
+  intro.santa.position.set(X,0,Z-2.1);  intro.santa.rotation.y=-Math.PI/2+0.4;   // turned toward Adam
+  intro.adam.position.set(X,0,Z);       intro.adam.rotation.y=-Math.PI/2;
+  if(isGrinch){
+    star.group.position.set(X+0.2,0,Z+2.3); star.group.rotation.set(0,-Math.PI/2-0.45,0);
+    star.group.visible=true; if(star.tag) star.tag.visible=false;
+  } else {
+    star.group.position.set(X+0.6,0,Z+3.6); star.group.rotation.y=Math.PI;   // facing −z, head toward Adam
+    star.action.stop(); star.idleAct.reset().play();
+  }
+  intro.carrot.visible = kind==='win';
   // The race lighting is tuned for side-lit runners; front-on to the camera it
   // washes everyone out to pastels — soften it for the studio-style shots
   intro.light=[hemiLight.intensity, sunLight.intensity];
   hemiLight.intensity=0.55; sunLight.intensity=0.85;
-  rud.action.stop(); rud.idleAct.reset().play();
   intro.santa.visible=intro.adam.visible=true;
   deerObjs.forEach(d=>{ if(d&&d.tag) d.tag.visible=false; });
   overlay.classList.add('off'); camBar.style.display='none';
   leaderEl.style.visibility=timerEl.style.visibility='hidden';
   introHud.style.display='block';
+  introHud.querySelector('#ihTicker').textContent=intro.ticker;
   introHud.querySelector('#ihCap').textContent='';
   introHud.querySelector('#ihSuper').style.opacity=0;
-  intro.active=true; intro.i=-1; intro.lineT=0; intro.shot=null;
-  crowdRoar('cheer',0.35);
+  intro.active=true; intro.paused=false; intro.i=-1; intro.lineT=0; intro.shot=null;
+  introHud.querySelector('#ihPause').textContent='⏸ Pause';
+  introHud.querySelector('#ihLive').textContent='● LIVE';
+  crowdRoar('cheer', kind==='win' ? 0.6 : 0.35);
   clearTimeout(intro.timer); intro.timer=setTimeout(nextIntroLine, 1500);
 }
 function nextIntroLine(){
@@ -2744,26 +2881,39 @@ function nextIntroLine(){
   const prev=intro.lines[intro.i-1], first=intro.i<2, last=intro.i>=intro.lines.length-2;
   const nextWho=(intro.lines[intro.i+1]||[])[0];
   intro.shot = (first||last) ? 'wide' : who===A ? ('two_'+(nextWho&&nextWho!==A?nextWho:S)) : who;
+  intro.shot = intro.shot.replace('grinch','elf');   // the Grinch is framed like the jockey (the "star" slot)
   const cap=introHud.querySelector('#ihCap');
-  cap.innerHTML=`<b style="color:#f4c95d">${INTRO_SUPERS[who][0]}:</b> ${text}`;
+  cap.innerHTML=`<b style="color:#f4c95d">${intro.supers[who][0]}:</b> ${text}`;
   // Name super the first time each person speaks
   const sup=introHud.querySelector('#ihSuper');
   if(!intro.lines.slice(0,intro.i).some(l=>l[0]===who)){
-    introHud.querySelector('#ihName').textContent=INTRO_SUPERS[who][0];
-    introHud.querySelector('#ihRole').textContent=INTRO_SUPERS[who][1];
+    introHud.querySelector('#ihName').textContent=intro.supers[who][0];
+    introHud.querySelector('#ihRole').textContent=intro.supers[who][1];
     sup.style.opacity=1; setTimeout(()=>{ sup.style.opacity=0; }, 3800);
   }
-  if(/ho ho/i.test(text)) crowdRoar('cheer',0.25);
+  if(/ho ho|golden carrot goes/i.test(text)) crowdRoar('cheer',0.25);
   introSpeak(who, text, nextIntroLine);
+}
+// Speech engines can't reliably pause mid-utterance (Android ignores pause()),
+// so Pause cancels the line and freezes the scene; Resume replays that line.
+function toggleIntroPause(){
+  if(!intro.active) return;
+  intro.paused=!intro.paused;
+  introHud.querySelector('#ihPause').textContent = intro.paused ? '▶ Resume' : '⏸ Pause';
+  introHud.querySelector('#ihLive').textContent = intro.paused ? '❚❚ PAUSED' : '● LIVE';
+  if(intro.paused){ clearTimeout(intro.timer); try{ speechSynthesis.cancel(); }catch(e){} }
+  else { intro.i=Math.max(-1,intro.i-1); nextIntroLine(); }
 }
 function endIntro(){
   if(!intro.active) return;
   intro.active=false; clearTimeout(intro.timer);
   try{ speechSynthesis.cancel(); }catch(e){}
-  const rud=deerObjs[8];
-  if(rud && intro.saved){ rud.group.position.copy(intro.saved.p); rud.group.rotation.y=intro.saved.r; }
-  if(rud && rud.noseGroup) rud.noseGroup.scale.setScalar(1);
-  intro.santa.visible=intro.adam.visible=false;
+  const star=intro.star;
+  if(star && intro.saved){ star.group.position.copy(intro.saved.p); star.group.rotation.set(0,intro.saved.r,0); star.group.visible=intro.saved.v; }
+  if(star && star.noseGroup) star.noseGroup.scale.setScalar(1);
+  if(star===grinch) grinchLaughReset();
+  if(star && star.elf && star.elf.userData.head) star.elf.userData.head.rotation.y=0;
+  intro.santa.visible=intro.adam.visible=intro.carrot.visible=false;
   if(intro.light){ hemiLight.intensity=intro.light[0]; sunLight.intensity=intro.light[1]; }
   deerObjs.forEach(d=>{ if(d&&d.tag) d.tag.visible=true; });
   introHud.style.display='none';
@@ -2771,41 +2921,63 @@ function endIntro(){
   overlay.classList.remove('off');
 }
 function updateIntro(dt){
+  if(intro.paused) return;              // frozen frame (still rendered)
   intro.lineT+=dt; intro.push+=dt;
-  const rud=deerObjs[8];
-  rud.mixer.timeScale=1; rud.mixer.update(dt);
-  trackAttachments();                   // seats the jockey + places Rudolph's nose
+  const rud=intro.star, isG=rud===grinch;
+  if(!isG){ rud.mixer.timeScale=1; rud.mixer.update(dt); }
+  trackAttachments();                   // seats the jockeys + places Rudolph's nose
   const line=intro.lines[intro.i]||[], who=line[0], text=line[1]||'';
   const t=intro.lineT, talk=k=>who===k && t<20;
-  // Everyone faces the camera; the jockey turns from his saddle
-  if(rud.elf){ rud.elf.rotation.y=-Math.PI/2+0.3; if(talk(E)) rud.elf.position.y+=Math.abs(Math.sin(t*9))*0.05; }
+  // The jockey rides facing forward, turned ¾ toward the camera from the saddle
+  // The jockey rides facing forward (a slight turn); his HEAD turns to the camera
+  if(rud.elf){ rud.elf.rotation.y=rud.group.rotation.y+0.35;
+    const hd=rud.elf.userData.head; if(hd) hd.rotation.y=0.95;
+    if(talk(E)) rud.elf.position.y+=Math.abs(Math.sin(t*9))*0.05; }
+  if(isG){ if(talk(G) && /heh|ha ha|mwah/i.test(text)) grinchLaughPose(t); else { grinchLaughReset(); rud.group.rotation.y=-Math.PI/2-0.45; }
+           rud.group.position.y = talk(G) ? Math.abs(Math.sin(t*8))*0.06 : 0; }
+  // The Golden Carrot: Santa holds it at his side, and raises it to present
+  if(intro.carrot.visible){
+    const up = who===S && /golden carrot/i.test(text) ? Math.min(1,t*1.5) : 0;
+    intro.carrot.position.copy(intro.santa.localToWorld(new THREE.Vector3(0.5, 1.15+up*0.75, 0.35)));
+    intro.carrot.rotation.set(0, 0, -0.3*up);
+  }
   const sh=intro.santa.userData, ah=intro.adam.userData;
   sh.head.rotation.x = talk(S) ? Math.sin(t*7)*0.06 : 0;
   const hoho=talk(S) && /ho ho/i.test(text);
   sh.belly.scale.set(1+(hoho?Math.sin(t*22)*0.03:0), 1.05+(hoho?Math.sin(t*22)*0.04:0), .92);
   ah.head.rotation.x = talk(A) ? Math.sin(t*8)*0.05 : 0;
-  // Mic follows the conversation: up to Adam, out toward the guest when they answer
-  const [ax,az] = who===S ? [-0.55, 1.0] : who===E ? [-0.9, 1.35] : [-1.45, -0.35];
-  ah.arm.rotation.x += (ax - ah.arm.rotation.x)*Math.min(1,dt*5);
-  ah.arm.rotation.z += (az - ah.arm.rotation.z)*Math.min(1,dt*5);
-  const turnTo = who===A ? -Math.PI/2+0.3 : -Math.PI/2+0.75;
+  // Adam turns toward whoever has the floor (Santa on his right of screen-left,
+  // the jockey up on Rudolph to screen-right)…
+  const turnTo = who===S ? -Math.PI/2-0.6 : (who===E||who===G) ? -Math.PI/2+0.5 : -Math.PI/2;
   intro.adam.rotation.y += (turnTo - intro.adam.rotation.y)*Math.min(1,dt*4);
+  // …and points the mic at their mouth: aim the arm's −y axis from the shoulder
+  // at the mouth, in Adam's own (scaled) space. When he talks, it's held just
+  // in front of his own chin.
+  const mouth = who===S ? sh.head.localToWorld(new THREE.Vector3(0,-.07,.24))
+    : who===E && rud.elf ? (rud.elf.userData.head||rud.elf).localToWorld(new THREE.Vector3(0,.285,.14))
+    : who===G ? rud.group.localToWorld(new THREE.Vector3(0,2.05,.32))
+    : ah.head.localToWorld(new THREE.Vector3(0,-.12,.55));
+  intro.adam.updateMatrixWorld();
+  const tl=intro.adam.worldToLocal(mouth.clone()).sub(ah.arm.position).normalize();
+  const want=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,-1,0), tl);
+  ah.arm.quaternion.slerp(want, Math.min(1,dt*6));
   // Rudolph's nose glows brighter whenever he comes up
   if(rud.noseGroup) rud.noseGroup.scale.setScalar(/rudolph|nose/i.test(text) ? 1.12+Math.sin(t*10)*0.12 : 1);
   // Camera — locked-off TV shots framed from the characters' real head
   // positions, a slow push-in, and a cut on every line. All four stand on the
   // x=X line and the camera looks +x at them, so framing is a z/y box.
-  const X=INTRO_SPOT.x, v=new THREE.Vector3();
+  const X=intro.spot.x, v=new THREE.Vector3();
   const head=o=>{ o.getWorldPosition(v); return v.clone(); };
   const aH=head(ah.head), sH=head(sh.head);
-  const eH=rud.elf ? rud.elf.position.clone().add(new THREE.Vector3(0,0.75,0)) : sH.clone();
+  const eH = isG ? rud.group.localToWorld(new THREE.Vector3(0,2.15,0))
+    : rud.elf ? rud.elf.position.clone().add(new THREE.Vector3(0,0.75,0)) : sH.clone();
   const box=pts=>{ let z0=1e9,z1=-1e9,y0=1e9,y1=-1e9; pts.forEach(p=>{ z0=Math.min(z0,p[0]); z1=Math.max(z1,p[0]); y0=Math.min(y0,p[1]); y1=Math.max(y1,p[1]); });
     return {cz:(z0+z1)/2, cy:(y0+y1)/2, w:z1-z0, h:y1-y0}; };
   const bust=(H,up,down)=>[[H.z-0.9,H.y+up],[H.z+0.9,H.y-down]];
   const frames={
-    wide:      box([...bust(aH,0.6,2.6), [rud.group.position.z+2.2, 0.3], [eH.z, eH.y+1.2]]),
+    wide:      box([...bust(sH,1.0,2.9), ...bust(aH,0.6,2.6), [rud.group.position.z+(isG?1.0:2.2), 0.3], [eH.z, eH.y+1.2]]),
     two_santa: box([...bust(aH,0.5,1.0), ...bust(sH,1.0,1.2)]),
-    two_elf:   box([...bust(aH,0.5,1.0), ...bust(sH,0.9,0.4), ...bust(eH,1.1,0.9)]),
+    two_elf:   box([...bust(aH,0.5,1.0), ...bust(eH,1.1,1.0)]),
     santa:     box(bust(sH,1.0,1.3)),
     elf:       box(bust(eH,1.1,1.1)),
     adam:      box(bust(aH,0.6,1.1))
@@ -2814,7 +2986,10 @@ function updateIntro(dt){
   // ≤11m keeps the camera in front of the inner rail (x=X-12.5) — no candy cane in the lens
   const dist=(intro.shot==='wide'?10.5:intro.shot&&intro.shot.startsWith('two')?8.5:6.5) - Math.min(1.2, intro.push*0.06);
   camera.up.set(0,1,0);
-  camera.position.set(X-dist, f.cy+0.4, f.cz);
+  // Jockey shots sit a little higher and toward Rudolph's tail, so the antlers
+  // aren't between the lens and Hermey's face
+  const elfShot = !isG && (intro.shot==='elf' || intro.shot==='two_elf');   // antler-dodging angle is for the jockey only
+  camera.position.set(X-dist, f.cy+(elfShot?1.1:0.4), f.cz+(elfShot&&intro.shot==='elf'?1.8:0));
   camera.lookAt(X, f.cy, f.cz);
   const asp=camera.aspect||1;
   const fov=2*Math.atan(Math.max(f.h*0.56, (f.w*0.56)/asp)/dist)*180/Math.PI;

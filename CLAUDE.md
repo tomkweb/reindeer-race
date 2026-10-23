@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.17.2 (version string appears in exactly 4 places —
+- **Current version:** v8.18.0 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -146,6 +146,34 @@ Changing STR/TR requires auditing every camera position and camera.far.
   camera stays ≤11m out so the inner rail isn't in the lens. Lights are
   softened during the interview and restored after.
 - Rudolph is moved to the spot and restored on exit; tags hidden meanwhile.
+- v8.18.0 (Tom's review): ⏸ Pause beside Skip (cancels the line + freezes;
+  Resume replays the line — Android ignores speechSynthesis.pause()). Order is
+  Santa · Adam · Rudolph; Adam's mic arm is one-bone IK aimed at the
+  speaker's mouth (`setFromUnitVectors` in Adam's local space). Jockey rides
+  facing forward; only his HEAD turns to camera (`elf.userData.head` — head
+  parts live in their own group in `makeElf`). Elves got a mouth and real
+  riding legs (thighs over the back, shins down the sides) — the old straight
+  legs ended inside the deer and the boot box poked out of the flank. Nose is
+  Santa red (sRGB→linear, emissive 1.1). "Louder" = crowd target 0.04 during
+  shows + softer show cheers (speech volume can't exceed 1).
+
+## Winner's interview (v8.18.0) — results screen "🎤 Winner Interview"
+- Same engine (`startShow(kind)`, kind 'pre' | 'win'; `intro.star` is the
+  featured runner). Winner's circle at `WIN_SPOT` (z=24, just past the line);
+  Santa presents the Golden Carrot (gold prop, raised on his presenting line).
+- `JOCKEYS` (NAMES order): Pepper Minstix, Sugarplum Mary, Shinny Upatree,
+  Alabaster Snowball, Wunorse Openslae, Bushy Evergreen (popular elf lore),
+  Jingle Jangleton, Tinsel Twinkletoes (ours), Hermey. Each jockey gets a
+  slightly different voice pitch.
+- `buildWinnerScript` uses `raceStats` (reset in configureRace): `margin` in
+  lengths when the winner crossed (`recordWinner`), `far` = running order at
+  the far turn. Story branch: photo finish (<0.6 L: nose/head/neck) → came
+  from ≥4th at the far turn → runaway (≥4 L) → else the runner-up "pushed you".
+  Never declares a result the race didn't produce.
+- Grinch wins → Adam interviews the Grinch (US voice pitched to a sneer,
+  laugh pose on "heh/mwah"), Santa: "Somebody check his pockets."
+- Test harness pattern: stage results (set `place`, `raceStats`), call
+  `startShow('win')`, log `intro.lines` — no need to run a race.
 
 ## Grandstand + crowd (v8.16.0)
 - `STAND` (x0=TR+TW/2+8, 12 rows × 1.7m deep × 0.85m rise, z 6→240) along the
