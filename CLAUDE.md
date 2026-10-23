@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.17.0 (version string appears in exactly 4 places —
+- **Current version:** v8.17.1 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -124,8 +124,10 @@ at the origin once and the far turn hung off the edge (the "blue band").
 Changing STR/TR requires auditing every camera position and camera.far.
 
 ## Pre-race interview — Intro button (v8.17.0)
-- Title screen: 🎤 Intro (left of Start Race). The Calibrate Nose button,
-  panel and code were REMOVED (Tom: no longer needed) — `noseOff` is final.
+- Title screen: 🎤 Intro · Start Race · 🔴 Calibrate Nose. Calibration was
+  removed in v8.17.0 and RESTORED in v8.17.1 — seeing Rudolph up close in the
+  interview showed the nose needs re-tuning. Tom reads x/y/z off the panel
+  ("Tell Claude: …") and the values get baked into `noseOff`.
 - NPN (North Pole News) reporter **Adam** interviews **Santa** and Rudolph's
   jockey **Hermey** (`ELF_NAME` — the 1964 TV special's would-be dentist) on
   the track in front of the grandstand (`INTRO_SPOT`). Santa/Adam are built
