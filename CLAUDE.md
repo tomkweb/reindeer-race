@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.18.0 (version string appears in exactly 4 places —
+- **Current version:** v8.18.1 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -74,6 +74,18 @@ transcribed; audio + frames measured locally, nothing from it committed):
   and simplified race physics; v8.11 called 26% of lead changes, v8.12 ~73%
   (the rest are re-passed before they can be called), median delay ~1.1s.
 - The race is 1.25 "miles" = 10 furlongs.
+
+## Voice fallback (v8.18.1) — IMPORTANT
+Cloud TTS voices (Edge "Microsoft … Online (Natural)", Chrome "Google …") are
+the nicest but intermittently fail with `synthesis-failed`; on 2026-10-25
+Edge 155 on Tom's PC had ALL of them failing and the game went silent (only
+the crowd played). `ttsVoice()` + `ttsGuard()` now wrap every utterance (race
+calls and interviews): on a fatal error or no `start` within 3s the voice is
+marked bad for the session and the line is re-spoken on an OFFLINE
+(`localService`) voice — male for Adam/Santa/caller, non-male for jockeys.
+Diagnose speech with Claude in Chrome on the live page: wrap
+`speechSynthesis.speak` to log start/end/error events, then REALLY click a
+button (speech without a user gesture fails `not-allowed`).
 
 ## Camera system (broadcast structure)
 gate head-on (2s hold) → wire cam first pass (frames whole pack, real lens
