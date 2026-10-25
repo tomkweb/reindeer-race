@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v8.18.1</title>
+<title>Reindeer Dash v8.18.2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -109,7 +109,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.18.1</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.18.2</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -161,7 +161,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v8.18.1';
+const VERSION='v8.18.2';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -1345,9 +1345,9 @@ function configureRace(){
     d.flightProg=-1; d.nextFlight=2.5+Math.random()*4;
     d.base   = 13.6 + Math.random()*0.8; // tight spread — nobody runs away with it
     d.isCloser = false;                // drama closer — assigned below
-    d.surgeF = 0.10 + Math.random()*0.14; // long, slow surges — leaders hold real stints
+    d.surgeF = 0.08 + Math.random()*0.112; // long, slow surges — leaders hold real stints (20% slower in v8.18.2: ~11 lead changes/race, was ~13)
     d.surgeP = Math.random()*Math.PI*2;
-    d.amp    = 0.08 + Math.random()*0.07;  // ~12 lead changes a race
+    d.amp    = 0.08 + Math.random()*0.07;  // surge size — barely moves the lead-change count; surgeF does
     d.speed  = d.base;
     const sp=trackPos(P_GATE, d.laneOff);
     d.group.position.set(sp.x, 0, sp.z);
@@ -2457,7 +2457,7 @@ function showResults(){
   document.getElementById('winIntBtn').addEventListener('click', ()=>startShow('win'));
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.18.1</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.18.2</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
@@ -2760,11 +2760,15 @@ function buildReporter(){
   const tieM=new THREE.Mesh(new THREE.BoxGeometry(.05,.26,.03),tie); tieM.position.set(0,1.38,.245); g.add(tieM);
   const lArm=new THREE.Mesh(new THREE.CylinderGeometry(.065,.07,.62,8),suit);
   lArm.position.set(-.29,1.25,0); lArm.rotation.z=-.12; g.add(lArm);
-  // Right arm on a shoulder pivot — it swings the mic toward whoever's talking
+  // Mic arm: shoulder pivot + ELBOW. Reaching to a guest it's straight; when
+  // Adam talks the forearm bends up so the mic points at his own mouth.
   const arm=new THREE.Group(); arm.position.set(.29,1.52,0); g.add(arm);
-  const sleeve=new THREE.Mesh(new THREE.CylinderGeometry(.065,.07,.55,8),suit); sleeve.position.y=-.27; arm.add(sleeve);
-  const hand=new THREE.Mesh(new THREE.SphereGeometry(.06,8,8),skin); hand.position.y=-.57; arm.add(hand);
-  const mic=new THREE.Group(); mic.position.y=-.6; mic.rotation.x=Math.PI; arm.add(mic);   // ball points out along the arm
+  const upper=new THREE.Mesh(new THREE.CylinderGeometry(.068,.07,.3,8),suit); upper.position.y=-.15; arm.add(upper);
+  const elbow=new THREE.Group(); elbow.position.y=-.29; arm.add(elbow);
+  const joint=new THREE.Mesh(new THREE.SphereGeometry(.066,8,8),suit); elbow.add(joint);
+  const fore=new THREE.Mesh(new THREE.CylinderGeometry(.062,.066,.28,8),suit); fore.position.y=-.14; elbow.add(fore);
+  const hand=new THREE.Mesh(new THREE.SphereGeometry(.06,8,8),skin); hand.position.y=-.3; elbow.add(hand);
+  const mic=new THREE.Group(); mic.position.y=-.33; mic.rotation.x=Math.PI; elbow.add(mic);   // ball points out along the forearm
   const handle=new THREE.Mesh(new THREE.CylinderGeometry(.025,.03,.28,8),M(0x111111,.4)); handle.position.y=.06; mic.add(handle);
   const ball=new THREE.Mesh(new THREE.SphereGeometry(.055,10,8),M(0x777777,.9)); ball.position.y=.23; mic.add(ball);
   const cv=document.createElement('canvas'); cv.width=128; cv.height=64;
@@ -2782,7 +2786,7 @@ function buildReporter(){
   });
   const smile=new THREE.Mesh(new THREE.BoxGeometry(.08,.015,.02),M(0x7a3a2a)); smile.position.set(0,-.06,.15); head.add(smile);
   const scarf=new THREE.Mesh(new THREE.CylinderGeometry(.13,.15,.08,12),tie); scarf.position.y=1.6; g.add(scarf);
-  g.userData={head, arm};
+  g.userData={head, arm, elbow};
   g.scale.setScalar(1.7); g.visible=false; scene.add(g);
   return g;
 }
@@ -2994,9 +2998,28 @@ function updateIntro(dt){
     : who===G ? rud.group.localToWorld(new THREE.Vector3(0,2.05,.32))
     : ah.head.localToWorld(new THREE.Vector3(0,-.12,.55));
   intro.adam.updateMatrixWorld();
-  const tl=intro.adam.worldToLocal(mouth.clone()).sub(ah.arm.position).normalize();
-  const want=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,-1,0), tl);
-  ah.arm.quaternion.slerp(want, Math.min(1,dt*6));
+  let wantArm, wantElbow;
+  if(who===A){
+    // Talking: two-bone IK in Adam's own space. Hand goes just below and in
+    // front of his chin; the elbow drops down and out (law of cosines with a
+    // down/out pole); the forearm — and the mic along it — points up at his mouth.
+    const S=ah.arm.position, up=0.29, fo=0.3;                 // shoulder, bone lengths
+    const H=new THREE.Vector3(0.07,1.5,0.24);                 // hand target: shoulder height, under his chin
+    const SH=H.clone().sub(S), d=Math.min(up+fo-1e-3, SH.length()), u=SH.normalize();
+    const cosA=(up*up+d*d-fo*fo)/(2*up*d), sinA=Math.sqrt(Math.max(0,1-cosA*cosA));
+    const pole=new THREE.Vector3(0.6,-1,0.15), w=pole.sub(u.clone().multiplyScalar(pole.dot(u))).normalize();
+    const E=S.clone().add(u.clone().multiplyScalar(up*cosA)).add(w.multiplyScalar(up*sinA));
+    wantArm=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,-1,0), E.clone().sub(S).normalize());
+    const foreLocal=H.clone().sub(E).normalize().applyQuaternion(wantArm.clone().invert());
+    wantElbow=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,-1,0), foreLocal);
+  } else {
+    // A guest has the floor: straight arm reaching the mic to their mouth
+    const tl=intro.adam.worldToLocal(mouth.clone()).sub(ah.arm.position).normalize();
+    wantArm=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,-1,0), tl);
+    wantElbow=new THREE.Quaternion();
+  }
+  ah.arm.quaternion.slerp(wantArm, Math.min(1,dt*6));
+  ah.elbow.quaternion.slerp(wantElbow, Math.min(1,dt*6));
   // Rudolph's nose glows brighter whenever he comes up
   if(rud.noseGroup) rud.noseGroup.scale.setScalar(/rudolph|nose/i.test(text) ? 1.12+Math.sin(t*10)*0.12 : 1);
   // Camera — locked-off TV shots framed from the characters' real head

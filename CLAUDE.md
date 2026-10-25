@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.18.1 (version string appears in exactly 4 places —
+- **Current version:** v8.18.2 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -24,8 +24,13 @@ commit. Pages redeploys in 2–5 min. Other repo files: `scene.gltf`
 (crowd samples, CC-BY-4.0 by Gregor Quendel) — keep both credit lines.
 
 ## Race drama system (the heart of it)
-- Base speeds tightly banded (13.6–14.4) + big sinusoidal surges →
-  constant lead changes (~69/race in simulation)
+- Base speeds tightly banded (13.6–14.4) + sinusoidal surges → lead
+  changes. Measured (v8.18.2, Node mirror of updateRace, 600 races): ~11
+  lead changes/race that last ≥1s (Tom asked for "a little" fewer than the
+  previous ~13). The lever is surge FREQUENCY (`surgeF` 0.08–0.19); surge
+  amplitude and the per-frame ±1.5% noise barely change the count. Closer
+  still wins ~80%. Headless Chrome is too slow for multi-race stats — use
+  the Node mirror (scratchpad `leadsim.js` pattern)
 - Rubber-band compresses the pack (front eased, back helped, ±15% cap)
 - **The closer:** one random deer per race sits 7th–9th through 70%, then
   runs a gap-aware kick (speed computed per frame from what's needed to
@@ -166,7 +171,9 @@ Changing STR/TR requires auditing every camera position and camera.far.
   parts live in their own group in `makeElf`). Elves got a mouth and real
   riding legs (thighs over the back, shins down the sides) — the old straight
   legs ended inside the deer and the boot box poked out of the flank. Nose is
-  Santa red (sRGB→linear, emissive 1.1). "Louder" = crowd target 0.04 during
+  Santa red (sRGB→linear, emissive 1.1). Adam's mic arm has an ELBOW
+  (v8.18.2): talking = two-bone IK (hand under his chin, elbow down/out,
+  forearm + mic pointing up at his mouth); guest talking = straight reach. "Louder" = crowd target 0.04 during
   shows + softer show cheers (speech volume can't exceed 1).
 
 ## Winner's interview (v8.18.0) — results screen "🎤 Winner Interview"
