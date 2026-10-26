@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v8.18.3</title>
+<title>Reindeer Dash v8.18.4</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -109,7 +109,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.18.3</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.18.4</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -161,7 +161,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v8.18.3';
+const VERSION='v8.18.4';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -2466,7 +2466,7 @@ function showResults(){
   document.getElementById('winIntBtn').addEventListener('click', ()=>startShow('win'));
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.18.3</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.18.4</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
@@ -2579,7 +2579,9 @@ const INTRO_SCRIPT=[
      [E,`Hi, Mom!`] ],
    [ [A,`Hello from trackside at the Reindeer Dash! Adam here for North Pole News, and boy, is it cold out here.`],
      [A,`Let's talk to the man in red. Santa, welcome!`],
-     [S,`Ho ho ho! Thank you, Adam. Looks like the whole North Pole turned out today!`] ]],
+     [S,`Ho ho ho! Thank you, Adam. Looks like the whole North Pole turned out today!`],
+     [A,`And up in the saddle, Rudolph's jockey for today, ${ELF_NAME} the elf!`],
+     [E,`Hi, everybody! Nice to be here!`] ]],
   // Santa on Rudolph
   [[ [A,`Santa, you've got nine reindeer out there. Why does Rudolph get all the attention?`],
      [S,`That nose has guided my sleigh through fog thicker than Mrs. Claus's gravy. When I need someone I can trust, I trust Rudolph.`] ],

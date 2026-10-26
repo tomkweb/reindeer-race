@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.18.3 (version string appears in exactly 4 places —
+- **Current version:** v8.18.4 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
