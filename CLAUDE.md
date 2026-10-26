@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.18.6 (version string appears in exactly 4 places —
+- **Current version:** v8.18.7 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -249,7 +249,13 @@ headless rAF throttling makes live-race timing useless. Syntax-check the
 main script block with node vm before every delivery.
 
 ## Open items
-- Real-phone verification of v7.9 drama pacing and camera framing
+- WAITING ON TOM: confirm the 8 non-Hermey jockey names (`JOCKEYS`) —
+  proposed, never confirmed
+- OFFERED, not chosen: pre-recorded voices (generate interview lines — and
+  stitched announcer pieces — as audio files) so voices can't fail on the
+  night; would need a TTS tool (installing `edge-tts` was blocked by the
+  permission system, needs Tom's OK)
+- Real-phone verification of drama pacing and camera framing (v8.x)
 - Camera ideas from the broadcast analysis (not yet done): real coverage
   uses far fewer cuts — one long telephoto side-on pan carries most of the
   backstretch (Belmont: ~60s unbroken), head-on telephoto into turns, 7-14s
