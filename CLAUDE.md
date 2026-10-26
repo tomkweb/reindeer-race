@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.18.4 (version string appears in exactly 4 places —
+- **Current version:** v8.18.5 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -95,6 +95,10 @@ ROOT CAUSE on Tom's PC (2026-10-26): **Proton VPN** — with it on, every Edge
 "Online (Natural)" voice fails; off, they work. Keep the VPN on by excluding
 msedge.exe via Proton split tunnelling. The offline fallback (Microsoft
 David) is slow and monotone — it's a safety net, not the intended sound.
+v8.18.5: the first cloud-voice failure shows a dismissible banner ("…If a
+VPN is on, turn it off (or exclude this browser)…", auto-hides after 20s,
+once per session). A page can't detect a VPN directly — the failing voice
+IS the signal, and it also covers no-internet/firewall cases.
 Diagnose speech with Claude in Chrome on the live page: wrap
 `speechSynthesis.speak` to log start/end/error events, then REALLY click a
 button (speech without a user gesture fails `not-allowed`).

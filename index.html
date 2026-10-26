@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v8.18.4</title>
+<title>Reindeer Dash v8.18.5</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -109,7 +109,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.18.4</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.18.5</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -161,7 +161,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v8.18.4';
+const VERSION='v8.18.5';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -313,10 +313,29 @@ function ttsVoice(pref, lang, male, avoid){
 // One blip doesn't condemn a voice: only 2 failures in a row drop it for the
 // session; any line that starts resets its count. (Dropping a voice on the
 // first blip switched Adam to the robot voice mid-interview.)
+// A web page can't see whether a VPN is on — but it can see the symptom: the
+// online (cloud) voices failing. On the first such failure, explain what to do
+// (Tom's PC: Proton VPN broke every Edge "Online (Natural)" voice).
+let voiceWarned=false;
+function showVoiceWarning(){
+  if(voiceWarned) return; voiceWarned=true;
+  const d=document.createElement('div');
+  d.style.cssText='position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:30;max-width:min(560px,92vw);'+
+    'background:#fff8e1;color:#3a2a00;border:2px solid #f4c95d;border-radius:12px;padding:10px 40px 10px 14px;'+
+    'font-family:Fredoka,sans-serif;font-size:.95rem;line-height:1.35;box-shadow:0 6px 20px rgba(0,0,0,.35)';
+  d.innerHTML='<b>⚠️ The good online voices are not working on this device.</b><br>'+
+    'If a <b>VPN</b> is on, turn it off (or exclude this browser from it), then reload the page. '+
+    'A basic backup voice is filling in for now.'+
+    '<button style="position:absolute;top:6px;right:8px;border:none;background:none;font-size:1.2rem;cursor:pointer;color:#3a2a00" aria-label="Dismiss">✕</button>';
+  d.querySelector('button').addEventListener('click',()=>d.remove());
+  document.body.appendChild(d);
+  setTimeout(()=>{ if(d.isConnected) d.remove(); }, 20000);
+}
 function ttsGuard(u, v, retry){
   let started=false, handled=false;
   u.addEventListener('start',()=>{ started=true; if(v) ttsFails[v.name]=0; });
   const fail=()=>{ if(handled||!v) return false; handled=true;
+    if(!v.localService) showVoiceWarning();
     ttsFails[v.name]=(ttsFails[v.name]||0)+1;
     if(ttsFails[v.name]>=2) ttsBad.add(v.name);
     retry(v.name); return true; };
@@ -2466,7 +2485,7 @@ function showResults(){
   document.getElementById('winIntBtn').addEventListener('click', ()=>startShow('win'));
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.18.4</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.18.5</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
