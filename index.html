@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v8.18.2</title>
+<title>Reindeer Dash v8.18.3</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -109,7 +109,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.18.2</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.18.3</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -161,7 +161,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v8.18.2';
+const VERSION='v8.18.3';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -293,10 +293,12 @@ if(window.speechSynthesis){
 // the game went completely silent (seen 2026-10-25 on Edge 155). Now a voice
 // that errors or doesn't start within 3s is marked bad for the session and the
 // line is re-spoken at once on an OFFLINE voice of the same language.
-const ttsBad=new Set();
+const ttsBad=new Set();       // voices dropped for the session (2 failures in a row)
+const ttsFails={};            // voice name → consecutive failures (reset by any line that starts)
 const TTS_FATAL=/synthesis-failed|synthesis-unavailable|network|voice-unavailable|audio-busy|audio-hardware|language-unavailable/;
-function ttsVoice(pref, lang, male){
-  if(pref && !ttsBad.has(pref.name)) return pref;
+// `avoid` = a voice that just failed THIS line — skip it for the retry only
+function ttsVoice(pref, lang, male, avoid){
+  if(pref && !ttsBad.has(pref.name) && pref.name!==avoid) return pref;
   const vs=(window.speechSynthesis&&speechSynthesis.getVoices())||[];
   const ok=vs.filter(v=>v.localService && !ttsBad.has(v.name));
   const L=(lang||'en').slice(0,2).toLowerCase();
@@ -306,13 +308,20 @@ function ttsVoice(pref, lang, male){
   return (male ? (sameLang.find(isMale)||en.find(isMale)) : (sameLang.find(v=>!isMale(v))||en.find(v=>!isMale(v))))
     || sameLang[0] || en[0] || null;
 }
-// Hook an utterance up to the fallback: on a fatal error / no start, mark the
-// voice bad and call retry() (which re-picks via ttsVoice → offline voice)
+// Hook an utterance up to the fallback. On a fatal error / no start, re-speak
+// THIS line on an offline voice (retry gets the failed voice's name to avoid).
+// One blip doesn't condemn a voice: only 2 failures in a row drop it for the
+// session; any line that starts resets its count. (Dropping a voice on the
+// first blip switched Adam to the robot voice mid-interview.)
 function ttsGuard(u, v, retry){
   let started=false, handled=false;
-  u.addEventListener('start',()=>{ started=true; });
-  const fail=()=>{ if(handled||!v) return false; handled=true; ttsBad.add(v.name); retry(); return true; };
-  const wd=setTimeout(()=>{ if(!started) fail(); }, 3000);   // a stuck cloud voice can report speaking=true yet never start
+  u.addEventListener('start',()=>{ started=true; if(v) ttsFails[v.name]=0; });
+  const fail=()=>{ if(handled||!v) return false; handled=true;
+    ttsFails[v.name]=(ttsFails[v.name]||0)+1;
+    if(ttsFails[v.name]>=2) ttsBad.add(v.name);
+    retry(v.name); return true; };
+  // Cloud voices stream over the internet and can take a few seconds to start
+  const wd=setTimeout(()=>{ if(!started) fail(); }, v && !v.localService ? 6000 : 3000);
   u.addEventListener('end',()=>clearTimeout(wd));
   return e=>{ clearTimeout(wd); return e && TTS_FATAL.test(e.error||'') ? fail() : false; };
 }
@@ -334,7 +343,7 @@ function say(txt, opts={}){
     speechSynthesis.cancel();
     const text = typeof txt==='function' ? txt() : txt;
     const u=new SpeechSynthesisUtterance(text);
-    const v=ttsVoice(ann.voice,'en-GB',true);
+    const v=ttsVoice(ann.voice,'en-GB',true,opts._avoid);
     if(v){ u.voice=v; u.lang=v.lang; } else u.lang='en-GB';
     // High-energy caller: brisk (~3 words/s, like real callers, who don't
     // speed up much at the finish) and pitched up from the first call, climbing
@@ -343,7 +352,7 @@ function say(txt, opts={}){
     u.rate=1.15+Math.min(0.1,Math.max(0,(r-1.1)*0.3));
     u.pitch=Math.min(1.9, 1.15+Math.max(0,p-1)*2.0); u.volume=1;
     const me={pri}; ann.cur=me;
-    const failed=ttsGuard(u, v, ()=>{ if(ann.cur===me){ ann.cur=null; say(text, Object.assign({},opts,{force:true})); } });
+    const failed=ttsGuard(u, v, bad=>{ if(ann.cur===me){ ann.cur=null; say(text, Object.assign({},opts,{force:true,_avoid:bad})); } });
     u.onend=u.onerror=e=>{
       if(e && e.type==='error' && failed(e)) return;   // re-spoken on a working voice
       if(ann.cur!==me) return;
@@ -1345,7 +1354,7 @@ function configureRace(){
     d.flightProg=-1; d.nextFlight=2.5+Math.random()*4;
     d.base   = 13.6 + Math.random()*0.8; // tight spread — nobody runs away with it
     d.isCloser = false;                // drama closer — assigned below
-    d.surgeF = 0.08 + Math.random()*0.112; // long, slow surges — leaders hold real stints (20% slower in v8.18.2: ~11 lead changes/race, was ~13)
+    d.surgeF = 0.08 + Math.random()*0.112; // long, slow surges — leaders hold real stints (20% slower since Oct 2026: ~11 lead changes/race, was ~13)
     d.surgeP = Math.random()*Math.PI*2;
     d.amp    = 0.08 + Math.random()*0.07;  // surge size — barely moves the lead-change count; surgeF does
     d.speed  = d.base;
@@ -2457,7 +2466,7 @@ function showResults(){
   document.getElementById('winIntBtn').addEventListener('click', ()=>startShow('win'));
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.18.2</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.18.3</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
@@ -2805,7 +2814,7 @@ function introPickVoices(){
 }
 const INTRO_STYLE={adam:{pitch:.95, rate:1.08}, santa:{pitch:.68, rate:.88}, elf:{pitch:1.8, rate:1.15},
   grinch:{pitch:.6, rate:.95}};  // pitch extremes sound quieter on phone speakers
-function introSpeak(who, text, done){
+function introSpeak(who, text, done, avoid){
   clearTimeout(intro.timer);
   const words=text.split(/\s+/).length;
   // Fallback clock: if speech is off/unavailable (or 'end' never fires), the
@@ -2816,9 +2825,9 @@ function introSpeak(who, text, done){
     speechSynthesis.cancel();
     const u=new SpeechSynthesisUtterance(text);
     const lang=(who==='elf'?'en-AU':who==='santa'?'en-GB':'en-US');
-    const v=ttsVoice(intro.voices[who], lang, who!=='elf');
+    const v=ttsVoice(intro.voices[who], lang, who!=='elf', avoid);
     if(v){ u.voice=v; u.lang=v.lang; } else u.lang=lang;
-    const failed=ttsGuard(u, v, ()=>{ if(intro.active && !intro.paused) introSpeak(who, text, done); });
+    const failed=ttsGuard(u, v, bad=>{ if(intro.active && !intro.paused) introSpeak(who, text, done, bad); });
     u.onerror=e=>{ failed(e); };
     u.pitch=INTRO_STYLE[who].pitch; u.rate=INTRO_STYLE[who].rate; u.volume=1;
     u.onend=()=>{ clearTimeout(intro.timer); intro.timer=setTimeout(done, 380); };

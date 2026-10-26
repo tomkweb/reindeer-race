@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.18.2 (version string appears in exactly 4 places —
+- **Current version:** v8.18.3 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -85,9 +85,16 @@ Cloud TTS voices (Edge "Microsoft … Online (Natural)", Chrome "Google …") ar
 the nicest but intermittently fail with `synthesis-failed`; on 2026-10-25
 Edge 155 on Tom's PC had ALL of them failing and the game went silent (only
 the crowd played). `ttsVoice()` + `ttsGuard()` now wrap every utterance (race
-calls and interviews): on a fatal error or no `start` within 3s the voice is
-marked bad for the session and the line is re-spoken on an OFFLINE
-(`localService`) voice — male for Adam/Santa/caller, non-male for jockeys.
+calls and interviews): on a fatal error or no `start` (6s for cloud voices,
+3s offline) the line is re-spoken at once on an OFFLINE (`localService`)
+voice — male for Adam/Santa/caller, non-male for jockeys. v8.18.3: one blip
+only affects that line (`avoid`); a voice is dropped for the session only
+after 2 failures in a row (`ttsFails`, reset whenever a line starts) — the
+first version dropped it on one blip and Adam switched voices mid-interview.
+ROOT CAUSE on Tom's PC (2026-10-26): **Proton VPN** — with it on, every Edge
+"Online (Natural)" voice fails; off, they work. Keep the VPN on by excluding
+msedge.exe via Proton split tunnelling. The offline fallback (Microsoft
+David) is slow and monotone — it's a safety net, not the intended sound.
 Diagnose speech with Claude in Chrome on the live page: wrap
 `speechSynthesis.speak` to log start/end/error events, then REALLY click a
 button (speech without a user gesture fails `not-allowed`).
