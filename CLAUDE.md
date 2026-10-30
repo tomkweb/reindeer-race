@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.18.7 (version string appears in exactly 4 places —
+- **Current version:** v8.19.0 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -210,6 +210,11 @@ Changing STR/TR requires auditing every camera position and camera.far.
 - `STAND` (x0=TR+TW/2+8, 12 rows × 1.7m deep × 0.85m rise, z 6→240) along the
   OUTSIDE of the homestretch; finish line (z=0) at its near end. Banner wall
   "★ THE REINDEER DASH ★" above the top row.
+  End walls (v8.19.0) are raked like a handrail — 1.1m above the tiers,
+  following their slope — not full back-wall height; `standTopAt` only
+  treats the back wall as tall.
+- Starting gate (v8.19.0): "The Reindeer Race" sign on two uprights, its
+  bottom ~7.5m up so the name tags in the gate shot sit below it, not on it.
 - ~1,700 spectators = 4 InstancedMeshes (body/head/arms/Santa hats on ~35%),
   per-instance colour, `frustumCulled=false` (instances span 230m; base
   bounds would cull them). ALL animation is in the vertex shader

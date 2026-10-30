@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v8.18.7</title>
+<title>Reindeer Dash v8.19.0</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -109,7 +109,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.18.7</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.19.0</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -161,7 +161,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v8.18.7';
+const VERSION='v8.19.0';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -900,7 +900,7 @@ const crowdU={uT:{value:0}, uEx:{value:0}};
 function standTopAt(x,z){
   const backX=STAND.x0+STAND.rows*STAND.rowD, wallTop=STAND.rows*STAND.rise+4.8;
   if(z<STAND.z0-2 || z>STAND.z1+2 || x<STAND.x0-1 || x>backX+1.5) return 0;
-  if(x>backX-0.3 || z<STAND.z0+0.5 || z>STAND.z1-0.5) return wallTop;   // back wall + end walls
+  if(x>backX-0.3) return wallTop;   // back wall (raked end walls sit below the spectators)
   const r=Math.floor((x-STAND.x0)/STAND.rowD);
   return Math.min(STAND.rows, Math.max(1,r+1))*STAND.rise + 2.2;
 }
@@ -978,9 +978,13 @@ function buildGrandstand(){
   const ban=new THREE.Mesh(new THREE.PlaneGeometry(len,3.2), new THREE.MeshBasicMaterial({map:tex}));
   ban.rotation.y=-Math.PI/2;                 // face the track (−x)
   ban.position.set(backX-.02, topH+2.6, zc); scene.add(ban);
-  [S.z0-.3, S.z1+.3].forEach(z=>{
-    const end=new THREE.Mesh(new THREE.BoxGeometry(S.rows*S.rowD+.6, wallH, .6), concrete);
-    end.position.set(S.x0+S.rows*S.rowD/2, wallH/2, z); scene.add(end);
+  // End walls follow the rake of the tiers, a handrail's height above them
+  const rail=1.1, endW=S.rows*S.rowD+.6, end=new THREE.Shape();
+  end.moveTo(0,0); end.lineTo(endW,0); end.lineTo(endW,topH+rail); end.lineTo(0,S.rise+rail); end.closePath();
+  const endGeo=new THREE.ExtrudeGeometry(end,{depth:.4, bevelEnabled:false});
+  [S.z0-.5, S.z1+.1].forEach(z=>{
+    const m=new THREE.Mesh(endGeo, concrete);
+    m.position.set(S.x0-.3, 0, z); scene.add(m);
   });
   // Spectators
   const people=[];
@@ -1056,6 +1060,21 @@ function buildStartingGate(){
     gateGroup.add(hinge);
     gateDoors.push(hinge);
   }
+  // Sign high above the beam on two uprights — a box so it reads from both sides
+  const scv=document.createElement('canvas'); scv.width=1024; scv.height=160;
+  const sc=scv.getContext('2d');
+  sc.fillStyle='#f4c430'; sc.fillRect(0,0,1024,160);
+  sc.fillStyle='#b3202a'; sc.fillRect(10,10,1004,140);
+  sc.fillStyle='#ffffff'; sc.font='bold 100px sans-serif'; sc.textAlign='center'; sc.textBaseline='middle';
+  sc.fillText('The Reindeer Race', 512, 86);
+  const SH=W*160/1024, SY=H+4.3+SH/2;   // clear of the name tags
+  const sign=new THREE.Mesh(new THREE.BoxGeometry(W,SH,0.15),
+    new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(scv)}));
+  sign.position.y=SY; gateGroup.add(sign);
+  [-1,1].forEach(s=>{
+    const up=new THREE.Mesh(new THREE.BoxGeometry(0.2,SY-H,0.2),frameM);
+    up.position.set(s*(W/2-0.8),H+(SY-H)/2,0); gateGroup.add(up);
+  });
   // Position and orient at the gate location, facing direction of travel
   gateGroup.position.set(gp.x,0,gp.z);
   gateGroup.rotation.y=gp.ry;
@@ -2485,7 +2504,7 @@ function showResults(){
   document.getElementById('winIntBtn').addEventListener('click', ()=>startShow('win'));
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.18.7</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.19.0</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
