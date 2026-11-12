@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.22.0 (version string appears in exactly 4 places —
+- **Current version:** v8.23.0 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -142,9 +142,13 @@ wire cam with surge-adaptive zoom (blends aim toward the charging closer)
   fence posts, ahead of the leader, skipping spots inside an infield tree
   (`INFIELD_TREES`), ≥25m from the line (stand end wall); pans as the field
   passes, hard-cuts to a new spot once the leaders are 30m past. Auto
-  director: first pass prog 0.11-0.20 (wire before it), stretch 0.895-0.94
-  (wire 0.85-0.895, grandstand after). Only when the leader is ON the
+  director: first pass prog 0.11-0.20 (wire before it); final stretch
+  0.895-0.975 (Tom v8.23: "a few infield shots" — ~3 re-cuts; wire before,
+  grandstand side-on for the last ~75m). Only when the leader is ON the
   straight (`onStraight`), else wire. Homestretch = last 320m = prog > 0.893.
+  v8.23: also MID-BACKSTRETCH (`backMid`: leader x=-TR, z 90-240; runners
+  travel +z there) in place of the crane/telephoto/blimp pool. Cuts INTO and
+  OUT OF the rail cam are hard cuts (gliding would sweep across the field).
 - Run to the line (grandstand, raceFrac>0.88, v8.13.0): side-on from the
   outside rail framing lead room ahead of the leader back to 3rd place, so
   the leader is on the RIGHT (travel is left→right) with chasers trailing;
