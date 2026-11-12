@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v8.21.2</title>
+<title>Reindeer Dash v8.21.3</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -109,7 +109,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.21.2</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.21.3</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -161,7 +161,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v8.21.2';
+const VERSION='v8.21.3';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#b0503a'];   // deer coat tints (sRGB); Rudolph a red-brown so his nose stands out
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -1354,9 +1354,15 @@ function buildGrandstand(){
   c.fillText('★  THE REINDEER DASH  ★', 512, 68);
   const tex=new THREE.CanvasTexture(cv);
   tex.wrapS=THREE.RepeatWrapping; tex.repeat.set(Math.round(len/45),1);
-  const ban=new THREE.Mesh(new THREE.PlaneGeometry(len,3.2), new THREE.MeshBasicMaterial({map:srgbTex(tex),toneMapped:false}));
+  tex.anisotropy=renderer.capabilities.getMaxAnisotropy();   // sharp text at a glancing angle
+  // v8.21.3 (Tom: flickered from the backstretch): it sat 2cm off the wall —
+  // at ~300m the depth buffer can't separate them and they z-fought. Now 15cm
+  // out + polygonOffset, and no fog so the red stays red at any distance.
+  const banM=new THREE.MeshBasicMaterial({map:srgbTex(tex),toneMapped:false,fog:false,
+    polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-4});
+  const ban=new THREE.Mesh(new THREE.PlaneGeometry(len,3.2), banM);
   ban.rotation.y=-Math.PI/2;                 // face the track (−x)
-  ban.position.set(backX-.02, topH+2.6, zc); scene.add(ban);
+  ban.position.set(backX-.15, topH+2.6, zc); scene.add(ban);
   // End walls follow the rake of the tiers, a handrail's height above them
   const rail=1.1, endW=S.rows*S.rowD+.6, end=new THREE.Shape();
   end.moveTo(0,0); end.lineTo(endW,0); end.lineTo(endW,topH+rail); end.lineTo(0,S.rise+rail); end.closePath();
@@ -2888,7 +2894,7 @@ function showResults(){
   document.getElementById('winIntBtn').addEventListener('click', ()=>startShow('win'));
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.21.2</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.21.3</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;

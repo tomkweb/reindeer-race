@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.21.2 (version string appears in exactly 4 places —
+- **Current version:** v8.21.3 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -222,6 +222,13 @@ Changing STR/TR requires auditing every camera position and camera.far.
   (`crowdMaterial` onBeforeCompile, per-instance `aPhase`) driven by
   `crowdU.uT/uEx`; `uEx` follows `crowd.level`, so the stand erupts with the
   audio. ~100k tris, 4 draw calls, no per-frame CPU. No shadows on the crowd.
+- Stand banner (v8.21.3, Tom: flickered from the backstretch even with FX off):
+  it sat 2cm off the back wall and z-fought at ~300m. Now 15cm out +
+  polygonOffset -4, anisotropic filtering, `fog:false` (fog washed the red to
+  pink). Banner-strip flicker metric on a slow long-lens pan: 20.6 -> 5.1.
+  RULE: anything laid on a surface that's seen from far away needs real
+  separation (10cm+) or polygonOffset — near=0.1 leaves ~5cm of depth
+  resolution at 300m.
 - Cameras: `liftOverStand(tp,ta)` raises any camera whose line of sight
   crosses the stand (`standTopAt` incl. the taller back/end walls) — applied
   to every directed shot and the winner orbit. Telephoto on the homestretch
