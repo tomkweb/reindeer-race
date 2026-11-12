@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.19.0 (version string appears in exactly 4 places —
+- **Current version:** v8.19.1 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -215,6 +215,7 @@ Changing STR/TR requires auditing every camera position and camera.far.
   treats the back wall as tall.
 - Starting gate (v8.19.0): "The Reindeer Race" sign on two uprights, its
   bottom ~7.5m up so the name tags in the gate shot sit below it, not on it.
+  Uprights sit 0.2m BEHIND the sign (−z; v8.19.1) so they don't cross its face.
 - ~1,700 spectators = 4 InstancedMeshes (body/head/arms/Santa hats on ~35%),
   per-instance colour, `frustumCulled=false` (instances span 230m; base
   bounds would cull them). ALL animation is in the vertex shader
