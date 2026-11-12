@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v8.23.0</title>
+<title>Reindeer Dash v8.24.0</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -109,7 +109,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.23.0</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.24.0</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -161,7 +161,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v8.23.0';
+const VERSION='v8.24.0';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#b0503a'];   // deer coat tints (sRGB); Rudolph a red-brown so his nose stands out
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -596,7 +596,7 @@ let replayWasSlow=false;
 let preRace=false, preRaceTimer=0;
 const PRE_RACE_DUR=5.0; // seconds of gate head-on before gates open
 let camMode='auto', autoPick='gate', autoCutTimer=0;
-const railCam={z:null, side:0, cut:false}; let lastActiveCam='';   // infield rail cam state
+const railCam={z:null, side:0, cut:false, want:null, placed:null}; let lastActiveCam='';   // infield rail cam state
 const INFIELD_TREES=[];   // {x,z,r} of the infield Christmas trees
 let targetFov=54, currentFov=54; // smooth FOV transitions for telephoto effect
 let winnerCamActive=false, winnerCamTimer=0;
@@ -2319,7 +2319,7 @@ function packXZ(){
 // Vertical FOV that fits the top 3 runners (plus a landed Grinch) as seen from
 // camera position `from` aimed at `at`: each runner padded by a body length and
 // head-to-hoof height, in the current (often portrait) aspect, +20% margin.
-const FIT_TOP3=new Set(['grandstand','telephoto','headon_low','drone','wire','crane','infield','railcam']);
+const FIT_TOP3=new Set(['grandstand','telephoto','headon_low','drone','wire','crane','infield','railcam','across']);
 // Real-lens fit: the vertical FOV that just contains `positions` (deer, padded
 // by a body length either side and hooves-to-name-tag height) as seen from
 // `from` aimed at `at`, in the CURRENT aspect — portrait phone or landscape
@@ -2639,7 +2639,13 @@ function directCamera(dt){
     // Rail cam only once the leader is properly on the homestretch (x=+TR straight)
     const lq = ld ? trackPos(ld.progress,0) : null;
     const onStraight = !!lq && lq.x>TR-1 && lq.z<STR-20;            // on the homestretch
-    const backMid    = !!lq && lq.x<-TR+1 && lq.z>90 && lq.z<240;   // middle of the backstretch
+    // Middle of the backstretch (runners travel +z there): the across-the-
+    // infield shot toward the grandstand (Tom, v8.24)
+    const backMid    = !!lq && lq.x<-TR+1 && lq.z>100 && lq.z<230;
+    // Final stretch by WHERE the leader is (homestretch, runners travel −z):
+    // rail cam as they enter, homestretch cam, rail cam again at halfway, then
+    // side-on through the finish (Tom, v8.24)
+    const home = !!lq && prog>0.7 && lq.x>TR-1 && lq.z<STR-5 ? lq.z : null;
     // Broadcast-style directing — mirrors a real horse-race telecast:
     // few cuts, long continuous pans, telephoto on the backstretch,
     // head-on turning for home, one locked wire cam through the stretch.
@@ -2652,7 +2658,7 @@ function directCamera(dt){
     } else if(prog<0.45){
       autoPick='grandstand';           // through turn 1 into the backstretch
     } else if(prog<0.70 && backMid){
-      autoPick='railcam';              // mid-backstretch — infield rail cam (Tom, v8.23)
+      autoPick='across';               // mid-backstretch — across the infield to the stand
     } else if(prog<0.70){
       // Backstretch — cut between crane, telephoto, and one blimp look
       autoCutTimer-=dt;
@@ -2661,17 +2667,18 @@ function directCamera(dt){
         let pick; do{pick=pool[Math.floor(Math.random()*pool.length)];}while(pick===autoPick);
         autoPick=pick; autoCutTimer=4+Math.random()*2;
       }
-    } else if(prog<0.85){
+    } else if(home===null){
       autoPick='headon_low';           // far turn — field turns for home
-    } else if(prog<0.895){
+    } else if(home>230){
+      autoPick='railcam'; railCam.want=255;   // entering the stretch — infield rail cam
+    } else if(home>185){
       autoPick='wire';                 // stretch run — zoom tracks the late surge
-    } else if(prog<0.975){
-      // the drive for home — a few infield rail shots (it re-cuts each time
-      // the leaders pass), the roaring stand behind them
-      autoPick=onStraight?'railcam':'wire';
+    } else if(home>105){
+      autoPick='railcam'; railCam.want=140;   // halfway — infield rail cam again
     } else {
-      autoPick='grandstand';           // halfway to the wire — side view to the line
+      autoPick='grandstand';           // side-on through the finish
     }
+    if(autoPick!=='railcam') railCam.want=null;
     mode=autoPick;
   }
   activeCam=mode;
@@ -2848,12 +2855,15 @@ function directCamera(dt){
     if(lp){
       const side=lp.x>0?1:-1, dir=side>0?-1:1;             // dir = travel along z
       const cx=side*(TR-TW/2-5);
-      if(railCam.z===null || (lp.z-railCam.z)*dir>30 || lastActiveCam!=='railcam' || railCam.side!==side){
+      const fixed = railCam.want!=null && side>0;
+      if(fixed ? (railCam.placed!==railCam.want || lastActiveCam!=='railcam')
+               : (railCam.z===null || (lp.z-railCam.z)*dir>30 || lastActiveCam!=='railcam' || railCam.side!==side)){
         // Ahead of the leader, midway between two fence posts (posts every
         // CIRC/160 m of track distance d) so no candy cane sits in the lens
         const sp=CIRC/160;
         const dOf=z=>side>0 ? z : S2+(STR-z), zOf=d=>side>0 ? d : STR-(d-S2);
-        let z0=lp.z+dir*(28+Math.random()*10);
+        let z0=fixed ? railCam.want : lp.z+dir*(28+Math.random()*10);
+        railCam.placed=railCam.want;
         z0 = side>0 ? Math.max(25,z0)                       // ≥25m from the line: stand end wall out of frame
                     : Math.min(STR-15, Math.max(15,z0));
         railCam.z=zOf((Math.floor(dOf(z0)/sp)+0.5)*sp); railCam.side=side; railCam.cut=true;
@@ -2864,6 +2874,16 @@ function directCamera(dt){
       ta.set(lf.x, 1.8, lf.z);
     }
     camLabel.innerHTML='<span class="rec">●</span> INFIELD RAIL'; targetFov=30; sm=6.0;
+
+  } else if(mode==='across'){
+    // ACROSS THE INFIELD (v8.24): fixed long lens 120m out behind the
+    // backstretch, low, panning with the field — the grandstand across the
+    // infield is compressed in big behind them (the look Tom liked)
+    sm=3.0;
+    const g=steadyGroup((camera.aspect||1)<1 ? 12 : 30, 1/sm);
+    tp.set(-TR-TW/2-120, 6, 165);
+    if(g){ ta.set(g.x, 2, g.z); targetFov=fitFov(tp, ta, g.pts, 1.2); }
+    camLabel.innerHTML='<span class="rec">●</span> ACROSS THE INFIELD';
 
   } else if(mode==='infield'){
     const lf=leadersFrame();
@@ -2889,7 +2909,8 @@ function directCamera(dt){
   const a=1-Math.exp(-sm*dt);
   // Hard cuts into a new rail-cam spot AND out of the rail cam: gliding from a
   // fixed infield spot to the next shot would sweep the camera across the field
-  if(railCam.cut || (lastActiveCam==='railcam' && mode!=='railcam')){
+  const FIXED_CAMS=['railcam','across'];
+  if(railCam.cut || ((FIXED_CAMS.includes(mode)||FIXED_CAMS.includes(lastActiveCam)) && lastActiveCam!==mode)){
     camPos.copy(tp); camAim.copy(ta); currentFov=targetFov; railCam.cut=false; }
   else { camPos.lerp(tp,a); camAim.lerp(ta,a); }
   lastActiveCam=mode;
@@ -2944,7 +2965,7 @@ function showResults(){
   document.getElementById('winIntBtn').addEventListener('click', ()=>startShow('win'));
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.23.0</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.24.0</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;

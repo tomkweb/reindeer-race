@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.23.0 (version string appears in exactly 4 places —
+- **Current version:** v8.24.0 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -141,14 +141,17 @@ wire cam with surge-adaptive zoom (blends aim toward the charging closer)
   rail (x=TR-TW/2-5, 6.3m up, over the canes' hooks), placed midway between
   fence posts, ahead of the leader, skipping spots inside an infield tree
   (`INFIELD_TREES`), ≥25m from the line (stand end wall); pans as the field
-  passes, hard-cuts to a new spot once the leaders are 30m past. Auto
-  director: first pass prog 0.11-0.20 (wire before it); final stretch
-  0.895-0.975 (Tom v8.23: "a few infield shots" — ~3 re-cuts; wire before,
-  grandstand side-on for the last ~75m). Only when the leader is ON the
-  straight (`onStraight`), else wire. Homestretch = last 320m = prog > 0.893.
-  v8.23: also MID-BACKSTRETCH (`backMid`: leader x=-TR, z 90-240; runners
-  travel +z there) in place of the crane/telephoto/blimp pool. Cuts INTO and
-  OUT OF the rail cam are hard cuts (gliding would sweep across the field).
+  passes, hard-cuts to a new spot once the leaders are 30m past (first pass,
+  prog 0.11-0.20). FINAL STRETCH (v8.24, Tom's exact ask) is driven by the
+  leader's z on the homestretch, not prog: rail cam fixed at z≈255 as they
+  enter (z>230) → wire (230-185) → rail cam fixed at z≈140 at halfway
+  (185-105) → grandstand side-on through the finish (z<105).
+- Across the infield (`across`, v8.24): MID-BACKSTRETCH (leader x=-TR, z
+  100-230) — fixed long lens 120m out behind the backstretch at y=6, z=165,
+  panning with the field; the grandstand across the infield is compressed
+  in big behind them. (v8.23's inner-rail cam there looked outward at empty
+  ground — Tom didn't count it.) Cuts INTO and OUT OF fixed cams
+  (`FIXED_CAMS`: railcam, across) are hard cuts.
 - Run to the line (grandstand, raceFrac>0.88, v8.13.0): side-on from the
   outside rail framing lead room ahead of the leader back to 3rd place, so
   the leader is on the RIGHT (travel is left→right) with chasers trailing;
@@ -158,7 +161,9 @@ wire cam with surge-adaptive zoom (blends aim toward the charging closer)
   fenceGroup + finishPoles hidden during the one-frame capture
 
 ## Track & geometry
-STR=320, TR=120, CIRC≈2394m, TW=14. Oval centre (0, 160). Track runs CCW
+STR=320, TR=120, CIRC≈1394m (race 1.25 laps ≈ 1742m; first homestretch
+prog 0.016-0.20, backstretch ~0.42-0.60 (runners travel +z), final
+homestretch prog ≥0.816 (runners travel −z)), TW=14. Oval centre (0, 160). Track runs CCW
 (`u = 1-p` in trackPos). Gate at p=0.75, finish at cumulative 2.0
 (1.25 laps). Ground plane 2400×2400 centred on the oval — it was 800×800
 at the origin once and the far turn hung off the edge (the "blue band").
