@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.21.1 (version string appears in exactly 4 places —
+- **Current version:** v8.21.2 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -253,7 +253,12 @@ Changing STR/TR requires auditing every camera position and camera.far.
   blur (depth reprojection; skipped across cuts; pixels near the focus plane
   stay sharp because the camera tracks the runners), depth of field when
   FOV < 36° (focus = `camAim`, or `FX.aim` = the speaker in interviews), bloom
-  on near-white highlights, light grade + vignette + grain. On unless the
+  on near-white highlights, light grade + vignette. v8.21.2 (Tom: far stand
+  "jittery" behind the backstretch telephoto): NO film grain (per-frame noise
+  = flicker), motion blur always on (an on/off threshold popped) with streak
+  normalised to a 1/60s frame, DOF full strength with a second quarter-res
+  blur level for far backgrounds. Flicker metric (mean |f1-(f0+f2)/2| luma
+  over the top band, rAF hook + readPixels): 6.7 -> 1.3-1.9 (FX off: 2.6). On unless the
   pointer is coarse (phones); `?fx=0`/`?fx=1` force it (`1` also disables the
   auto-off: two 3s race windows under 40 fps turn it off). Name tags are on
   LAYER 1 and drawn after the composite (crisp, never blurred) — the camera

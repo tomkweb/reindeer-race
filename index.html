@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v8.21.1</title>
+<title>Reindeer Dash v8.21.2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -109,7 +109,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.21.1</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.21.2</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -161,7 +161,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v8.21.1';
+const VERSION='v8.21.2';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#b0503a'];   // deer coat tints (sRGB); Rudolph a red-brown so his nose stands out
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -799,7 +799,7 @@ function fxInit(){
   FX.rt=new THREE.WebGLRenderTarget(1,1,{minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter});
   FX.rt.texture.encoding=THREE.sRGBEncoding;           // scene shaders encode to display colours
   FX.rt.depthTexture=new THREE.DepthTexture(1,1); FX.rt.depthTexture.type=THREE.UnsignedIntType;
-  FX.h1=mk(); FX.h2=mk(); FX.q1=mk(); FX.q2=mk();
+  FX.h1=mk(); FX.h2=mk(); FX.q1=mk(); FX.q2=mk(); FX.q3=mk(); FX.q4=mk();
   FX.scene=new THREE.Scene(); FX.cam=new THREE.OrthographicCamera(-1,1,1,-1,0,1);
   FX.quad=new THREE.Mesh(new THREE.PlaneGeometry(2,2)); FX.quad.frustumCulled=false; FX.scene.add(FX.quad);
   FX.down=fxMat(`uniform sampler2D src; uniform vec2 px; varying vec2 vUv;
@@ -819,7 +819,7 @@ function fxInit(){
       gl_FragColor=c; }`,
     {src:{value:null}, dir:{value:new THREE.Vector2()}});
   FX.comp=fxMat(`#include <packing>
-    uniform sampler2D tCol, tDep, tSoft, tBloom; uniform vec2 px; uniform float near, far, focus,
+    uniform sampler2D tCol, tDep, tSoft, tSoft2, tBloom; uniform vec2 px; uniform float near, far, focus,
       dof, mb, bloom, time; uniform mat4 invVP, prevVP; varying vec2 vUv;
     const vec3 LU=vec3(0.299,0.587,0.114);
     vec3 fxaa(vec2 uv){
@@ -847,22 +847,26 @@ function fxInit(){
       float zz=-perspectiveDepthToViewZ(d,near,far);
       v*=smoothstep(0.08,0.4,abs(1.0-focus/zz));
       float vl=length(v); if(vl>0.035) v*=0.035/vl;
-      if(vl>0.0012){ vec3 acc=c;
+      // Always blur (no on/off threshold - that popped frame to frame)
+      { vec3 acc=c;
         for(int i=1;i<8;i++){ acc+=texture2D(tCol,vUv+v*(float(i)/7.0-0.5)).rgb; }
         c=acc/8.0; }
       // Depth of field: circle of confusion from distance to the focus plane
       float z=-perspectiveDepthToViewZ(d,near,far);
       float coc=dof*clamp(abs(1.0-focus/z)*1.8,0.0,1.0);
-      c=mix(c,texture2D(tSoft,vUv).rgb,coc);
+      // Two blur levels: half-res for near the focus plane, a much smoother
+      // quarter-res for far backgrounds (the busy far stand shimmered through
+      // the light blur when the long lens panned)
+      c=mix(c,texture2D(tSoft,vUv).rgb,clamp(coc*2.0,0.0,1.0));
+      c=mix(c,texture2D(tSoft2,vUv).rgb,clamp(coc*2.0-1.0,0.0,1.0));
       c+=texture2D(tBloom,vUv).rgb*bloom;
       // Grade: a touch more saturation + contrast, warm highlights, vignette, grain
       float l=dot(c,LU); c=mix(vec3(l),c,1.08); c=(c-0.5)*1.05+0.5;
       c*=mix(vec3(1.0),vec3(1.03,1.0,0.96),smoothstep(0.4,1.0,l));
       vec2 q=vUv-0.5; c*=mix(0.84,1.0,smoothstep(0.75,0.25,length(q*vec2(1.0,0.85))));
-      c+=(hash(vUv*1000.0+time)-0.5)*0.018;
       gl_FragColor=vec4(clamp(c,0.0,1.0),1.0);
     }`,
-    {tCol:{value:null}, tDep:{value:null}, tSoft:{value:null}, tBloom:{value:null},
+    {tCol:{value:null}, tDep:{value:null}, tSoft:{value:null}, tSoft2:{value:null}, tBloom:{value:null},
      px:{value:new THREE.Vector2()}, near:{value:.1}, far:{value:1000}, focus:{value:20},
      dof:{value:0}, mb:{value:.5}, bloom:{value:.35}, time:{value:0},
      invVP:{value:new THREE.Matrix4()}, prevVP:{value:new THREE.Matrix4()}});
@@ -873,7 +877,7 @@ function fxResize(){
   const v=renderer.getDrawingBufferSize(new THREE.Vector2()), w=v.x, h=v.y;
   FX.rt.setSize(w,h);
   const hw=Math.max(1,w>>1), hh=Math.max(1,h>>1), qw=Math.max(1,w>>2), qh=Math.max(1,h>>2);
-  FX.h1.setSize(hw,hh); FX.h2.setSize(hw,hh); FX.q1.setSize(qw,qh); FX.q2.setSize(qw,qh);
+  FX.h1.setSize(hw,hh); FX.h2.setSize(hw,hh); [FX.q1,FX.q2,FX.q3,FX.q4].forEach(t=>t.setSize(qw,qh));
   FX.w=w; FX.h=h;
 }
 function fxPass(mat, target){ FX.quad.material=mat; renderer.setRenderTarget(target); renderer.render(FX.scene, FX.cam); }
@@ -881,6 +885,8 @@ function fxRender(cam){
   // Self-check during races: average fps over 3s windows; two windows in a
   // row under 40 fps switches the effects off (loading hitches don't count)
   const now=performance.now();
+  const fdt=FX.lastT?Math.min(0.1,Math.max(1/240,(now-FX.lastT)/1000)):1/60; FX.lastT=now;
+  FX.comp.uniforms.mb.value=0.5*(1/60)/fdt;
   if(racing && !paused && !FX.force){
     if(!FX.winT) { FX.winT=now; FX.winN=0; }
     FX.winN++;
@@ -898,6 +904,12 @@ function fxRender(cam){
   const b=FX.blur.uniforms;
   b.src.value=FX.h1.texture; b.dir.value.set(1.6/FX.h1.width,0); fxPass(FX.blur,FX.h2);
   b.src.value=FX.h2.texture; b.dir.value.set(0,1.6/FX.h1.height); fxPass(FX.blur,FX.h1);
+  // ...and a much softer quarter-res copy for distant backgrounds
+  FX.down.uniforms.src.value=FX.h1.texture; FX.down.uniforms.px.value.set(1/FX.h1.width,1/FX.h1.height); fxPass(FX.down,FX.q3);
+  for(let i=0;i<2;i++){
+    b.src.value=FX.q3.texture; b.dir.value.set((1+i)/FX.q3.width,0); fxPass(FX.blur,FX.q4);
+    b.src.value=FX.q4.texture; b.dir.value.set(0,(1+i)/FX.q3.height); fxPass(FX.blur,FX.q3);
+  }
   // Bloom (quarter res, two blur rounds)
   FX.bright.uniforms.src.value=FX.rt.texture; FX.bright.uniforms.px.value.set(1/FX.w,1/FX.h); fxPass(FX.bright,FX.q1);
   for(let i=0;i<2;i++){
@@ -915,10 +927,10 @@ function fxRender(cam){
   const fz=Math.max(2, FX.fw.dot(aim.clone().sub(cam.position)));
   FX.focus = cut ? fz : FX.focus+(fz-FX.focus)*0.15;
   const u=FX.comp.uniforms;
-  u.tCol.value=FX.rt.texture; u.tDep.value=FX.rt.depthTexture; u.tSoft.value=FX.h1.texture; u.tBloom.value=FX.q1.texture;
+  u.tCol.value=FX.rt.texture; u.tDep.value=FX.rt.depthTexture; u.tSoft.value=FX.h1.texture; u.tSoft2.value=FX.q3.texture; u.tBloom.value=FX.q1.texture;
   u.px.value.set(1/FX.w,1/FX.h); u.near.value=cam.near; u.far.value=cam.far; u.focus.value=FX.focus;
   // Shallow focus only on long lenses and close-ups (narrow FOV)
-  u.dof.value=Math.min(1,Math.max(0,(36-cam.fov)/18))*0.85;
+  u.dof.value=Math.min(1,Math.max(0,(36-cam.fov)/18));
   u.invVP.value.copy(FX.vp).invert(); u.prevVP.value.copy(FX.prevVP);
   u.time.value=(now%10000)/1000;
   fxPass(FX.comp,null);
@@ -2876,7 +2888,7 @@ function showResults(){
   document.getElementById('winIntBtn').addEventListener('click', ()=>startShow('win'));
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.21.1</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.21.2</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
