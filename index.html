@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v8.19.1</title>
+<title>Reindeer Dash v8.20.0</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -109,7 +109,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.19.1</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.20.0</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -161,7 +161,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v8.19.1';
+const VERSION='v8.20.0';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -628,11 +628,152 @@ pauseBtn.addEventListener('click',()=>{
   pauseBtn.textContent = paused ? '▶' : '⏸';
 });
 
+// ── LOOK: sky, environment light, following shadows, ground textures (v8.20) ──
+// Colours authored as hex are sRGB; r128 treats material hex as LINEAR, which
+// is why everything read pastel. linearize() converts a subtree's materials
+// once (flagged in userData so shared materials aren't converted twice).
+const SKY={zen:0x3f73b8, hor:0xc9dcef, gnd:0x6d5a48};   // sRGB
+const LOOK_EXPOSURE=0.85, LOOK_HEMI=0.3, LOOK_SUN=2.6, LOOK_ENV=0.55;
+let skyDome=null;
+function linearize(root){
+  root.traverse(n=>{
+    if(!n.isMesh) return;
+    (Array.isArray(n.material)?n.material:[n.material]).forEach(m=>{
+      if(!m || m.userData.lin || !m.isMeshStandardMaterial) return;
+      m.userData.lin=true;
+      m.color.convertSRGBToLinear();
+      if(m.emissive) m.emissive.convertSRGBToLinear();
+    });
+  });
+}
+function srgbTex(t){ t.encoding=THREE.sRGBEncoding; return t; }
+// Gradient sky dome (follows the camera). r128 mixes fog in AFTER tone
+// mapping + sRGB encoding, so the fog colour is a display colour — the dome
+// therefore writes display colours too (no tone mapping) and its horizon
+// matches the fog exactly. A second copy in LINEAR colours, dimmed by
+// LOOK_ENV, is prefiltered into the environment map.
+const SKY_VS=`varying vec3 vD; void main(){ vD=normalize(position);
+  gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`;
+const SKY_FS=`uniform vec3 zen,hor,gnd,sunDir; varying vec3 vD;
+  void main(){ vec3 d=normalize(vD); float h=d.y;
+    vec3 c = h>0.0 ? mix(hor,zen,pow(clamp(h,0.0,1.0),0.6))
+                   : mix(hor,gnd,clamp(-h*6.0,0.0,1.0));
+    float s=max(dot(d,sunDir),0.0);
+    c += vec3(1.0,0.93,0.8)*(pow(s,500.0)*0.8 + pow(s,10.0)*0.12);
+    gl_FragColor=vec4(c,1.0);
+    #ifdef ENV_PASS
+    #include <encodings_fragment>
+    #endif
+  }`;
+function skyMat(lin,gain){
+  const col=c=>{ const k=new THREE.Color(c); if(lin) k.convertSRGBToLinear(); return k.multiplyScalar(gain); };
+  return new THREE.ShaderMaterial({side:THREE.BackSide, depthWrite:false, fog:false, toneMapped:false,
+    // Display dome: below the horizon stays horizon colour (it only shows past the
+    // ground's far clip, and must melt into the fog); the env copy gets real ground
+    uniforms:{zen:{value:col(SKY.zen)}, hor:{value:col(SKY.hor)}, gnd:{value:col(lin?SKY.gnd:SKY.hor)},
+              sunDir:{value:SUN_OFF.clone().normalize()}},
+    // ENV_PASS: PMREM renders into an RGBE target, so the output must be encoded
+    defines:lin?{ENV_PASS:''}:{}, vertexShader:SKY_VS, fragmentShader:SKY_FS});
+}
+function buildSky(){
+  const geo=new THREE.SphereGeometry(1000,32,16);
+  skyDome=new THREE.Mesh(geo,skyMat(false,1));
+  skyDome.renderOrder=-1; skyDome.frustumCulled=false;
+  scene.add(skyDome);
+  // Image-based light: every PBR surface picks up soft sky fill + reflections
+  const envScene=new THREE.Scene();
+  const envDome=new THREE.Mesh(geo,skyMat(true,LOOK_ENV)); envDome.scale.setScalar(0.05);
+  envScene.add(envDome);
+  const pm=new THREE.PMREMGenerator(renderer);
+  scene.environment=pm.fromScene(envScene,0.02).texture;
+  pm.dispose();
+}
+// Tileable noise texture painted on a canvas: base colour + soft blotches
+function noiseTex(w,h,base,spots,n,rmin,rmax,rep){
+  const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+  const c=cv.getContext('2d'); c.fillStyle=base; c.fillRect(0,0,w,h);
+  for(let i=0;i<n;i++){
+    const x=Math.random()*w, y=Math.random()*h, r=rmin+Math.random()*(rmax-rmin);
+    c.fillStyle=spots[i%spots.length]; c.globalAlpha=0.08+Math.random()*0.22;
+    for(const ox of [-w,0,w]) for(const oy of [-h,0,h]){
+      c.beginPath(); c.ellipse(x+ox,y+oy,r,r*(0.5+Math.random()*0.6),Math.random()*3,0,7); c.fill();
+    }
+  }
+  c.globalAlpha=1;
+  const t=srgbTex(new THREE.CanvasTexture(cv));
+  t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(rep[0],rep[1]);
+  t.anisotropy=renderer.capabilities.getMaxAnisotropy();
+  return t;
+}
+// Racing surface: a ribbon over the dirt with harrow lines running WITH the
+// track and scuffed hoof speckle, so the surface reads from every camera
+function buildTrackSurface(){
+  const W=256, H=512, cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+  const c=cv.getContext('2d'); c.fillStyle='#93673f'; c.fillRect(0,0,W,H);
+  for(let x=0;x<W;x+=2){          // harrow grooves: thin lines along the track
+    c.globalAlpha=0.05+Math.random()*0.12;
+    c.fillStyle=Math.random()<0.5?'#6e4a2a':'#b48658'; c.fillRect(x,0,1+Math.random()*1.5,H);
+  }
+  for(let i=0;i<2600;i++){        // clods + hoof scuffs
+    const x=Math.random()*W, y=Math.random()*H, r=0.6+Math.random()*2.6;
+    c.globalAlpha=0.15+Math.random()*0.35; c.fillStyle=Math.random()<0.55?'#5e3d22':'#c2976a';
+    c.beginPath(); c.ellipse(x,y,r,r*0.7,Math.random()*3,0,7); c.fill();
+  }
+  c.globalAlpha=1;
+  const tex=srgbTex(new THREE.CanvasTexture(cv));
+  tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
+  tex.anisotropy=renderer.capabilities.getMaxAnisotropy();
+  const half=TW/2+1.0, N=720, pos=[], uv=[], idx=[];
+  let along=0, prev=null;
+  for(let i=0;i<=N;i++){
+    const p=i/N, a=trackPos(p,-half), b=trackPos(p,half), m=trackPos(p,0);
+    if(prev) along+=Math.hypot(m.x-prev.x,m.z-prev.z);
+    prev=m;
+    pos.push(a.x,0.05,a.z, b.x,0.05,b.z);
+    uv.push(0,along/12, 3,along/12);      // texture repeats 12m along, 3× across
+    if(i<N){ const k=i*2; idx.push(k,k+1,k+2, k+1,k+3,k+2); }
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+  g.setIndex(idx); g.computeVertexNormals();
+  // Winding depends on track direction — force the normals up
+  const nm=g.attributes.normal; for(let i=0;i<nm.count;i++) nm.setXYZ(i,0,1,0);
+  const surf=new THREE.Mesh(g,new THREE.MeshStandardMaterial({map:tex,roughness:.95,side:THREE.DoubleSide}));
+  surf.material.userData.lin=true;
+  surf.receiveShadow=true;
+  scene.add(surf);
+}
+// Shadows follow what the camera is looking at: one tight 2048 map where the
+// action is, instead of a 1024 map smeared over 220m (blurry, blocky shadows)
+const SUN_OFF=new THREE.Vector3(-55,65,25), _fw=new THREE.Vector3();
+let shadowHalf=0;
+function sunFollow(cam){
+  cam.getWorldDirection(_fw);
+  let d=60;
+  if(_fw.y<-0.02) d=Math.min(260, Math.max(8, cam.position.y/-_fw.y));
+  const half=Math.min(130, Math.max(22, Math.ceil(d*0.5/4)*4));
+  const texel=2*half/sunLight.shadow.mapSize.x;
+  const tx=Math.round((cam.position.x+_fw.x*d)/texel)*texel;
+  const tz=Math.round((cam.position.z+_fw.z*d)/texel)*texel;
+  sunLight.target.position.set(tx,0,tz);
+  sunLight.position.set(tx+SUN_OFF.x, SUN_OFF.y, tz+SUN_OFF.z);
+  sunLight.target.updateMatrixWorld();
+  if(half!==shadowHalf){
+    shadowHalf=half; const sc=sunLight.shadow.camera;
+    sc.left=-half; sc.right=half; sc.top=half; sc.bottom=-half; sc.updateProjectionMatrix();
+  }
+}
+function render(cam=camera){
+  if(skyDome) skyDome.position.copy(cam.position);
+  sunFollow(cam);
+  renderer.render(scene, cam);
+}
+
 // ── INIT ──────────────────────────────────────────────────────────────────────
 function init(){
   scene  = new THREE.Scene();
-  scene.background = new THREE.Color(0x8aadd4);
-  scene.fog = new THREE.Fog(0x8aadd4, 120, 560);
+  scene.fog = new THREE.Fog(SKY.hor, 140, 620);   // display colour (see buildSky)
 
   camera = new THREE.PerspectiveCamera(54, innerWidth/innerHeight, 0.1, 1200);
   camera.position.copy(camPos);
@@ -643,38 +784,44 @@ function init(){
   renderer.outputEncoding  = THREE.sRGBEncoding;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type  = THREE.PCFSoftShadowMap;
+  // Filmic tone mapping: highlights roll off instead of clipping flat
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = LOOK_EXPOSURE;
   document.body.appendChild(renderer.domElement);
   clock = new THREE.Clock();
 
-  hemiLight=new THREE.HemisphereLight(0xd4eaff, 0x6a7a90, 0.9); scene.add(hemiLight);
-  const sun = new THREE.DirectionalLight(0xfff0d6, 1.3); sunLight=sun;
-  sun.position.set(-55, 65, 25);
+  hemiLight=new THREE.HemisphereLight(0xd4eaff, 0x6a5a48, LOOK_HEMI); scene.add(hemiLight);
+  const sun = new THREE.DirectionalLight(0xfff0d6, LOOK_SUN); sunLight=sun;
+  sun.position.copy(SUN_OFF);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(1024, 1024);
-  sun.shadow.camera.left = -110; sun.shadow.camera.right  = 110;
-  sun.shadow.camera.top  =  110; sun.shadow.camera.bottom = -110;
-  sun.shadow.camera.near = 1;    sun.shadow.camera.far    = 600;
-  scene.add(sun);
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.near = 1;    sun.shadow.camera.far    = 320;
+  sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
+  scene.add(sun); scene.add(sun.target);
 
+  buildSky();
   buildGround();
+  buildTrackSurface();
   buildScenery();
-  // INFIELD — green oval interior. Use full circles at each end + wide rect to fill gaps.
+  // INFIELD — one flat stadium shape (two straights + two semicircles). It was
+  // a box + two overlapping cylinders, whose coplanar overlap showed a seam
+  // once the grass had texture. UVs are in metres (texture tile = 8m).
   {
-    const infM=new THREE.MeshStandardMaterial({color:0x2d7a1a,roughness:.9});
+    const tex=noiseTex(256,256,'#4f8a3c',['#3f7530','#64a04a','#5a8a3a','#3a6a2c'],500,3,16,[1/8,1/8]);
+    const infM=new THREE.MeshStandardMaterial({roughness:.9, map:tex});
+    infM.userData.lin=true;
+    infM.polygonOffset=true; infM.polygonOffsetFactor=2; infM.polygonOffsetUnits=2;   // under the track ribbon, over the dirt
     const ri=TR-TW/2+0.5; // inner infield radius — overlaps under inner curb, no brown gap
-    // Central rectangle spanning the two straights (full width between turn centres)
-    const rect=new THREE.Mesh(new THREE.BoxGeometry(ri*2,0.05,STR),infM);
-    rect.position.set(0,0.02,STR/2);
-    scene.add(rect);
-    // Full circles at each turn centre (not semicircles) to guarantee no gaps
-    const botGeo=new THREE.CylinderGeometry(ri,ri,0.05,64);
-    const bot=new THREE.Mesh(botGeo,infM);
-    bot.position.set(0,0.02,0);
-    scene.add(bot);
-    const topGeo=new THREE.CylinderGeometry(ri,ri,0.05,64);
-    const top=new THREE.Mesh(topGeo,infM);
-    top.position.set(0,0.02,STR);
-    scene.add(top);
+    // Shape in XY with y = -z (rotated flat below)
+    const sh=new THREE.Shape();
+    sh.moveTo(ri,0); sh.lineTo(ri,-STR);
+    sh.absarc(0,-STR,ri,0,Math.PI,true);        // far turn, bulging past z=STR
+    sh.lineTo(-ri,0);
+    sh.absarc(0,0,ri,Math.PI,0,true);           // near turn, bulging to z<0
+    const inf=new THREE.Mesh(new THREE.ShapeGeometry(sh,48),infM);
+    inf.rotation.x=-Math.PI/2; inf.position.y=0.045;
+    inf.receiveShadow=true;
+    scene.add(inf);
   }
   buildStartingGate();
   buildSnow();
@@ -717,6 +864,7 @@ function init(){
     camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
   });
+  linearize(scene);   // world built so far: track, gate, stand, finish (deer load async)
   animate();
 }
 
@@ -724,8 +872,13 @@ function init(){
 function buildGround(){
   const g = new THREE.Mesh(
     new THREE.PlaneGeometry(2400, 2400),
-    new THREE.MeshStandardMaterial({color: 0x6b4423, roughness: 0.95}) // rich dirt brown
+    new THREE.MeshStandardMaterial({roughness: 0.95,
+      map: noiseTex(256,256,'#a88760',['#8c6c48','#bfa07a','#7d6a52','#c9b08c'],420,4,22,[400,400])})
   );
+  g.material.userData.lin=true;
+  // Push the dirt back in the depth buffer: from high cameras the infield (5cm
+  // above it) otherwise loses the depth fight and the grass shows as dirt
+  g.material.polygonOffset=true; g.material.polygonOffsetFactor=4; g.material.polygonOffsetUnits=4;
   g.rotation.x = -Math.PI/2;
   g.position.set(TC_X, 0, TC_Z);  // centre on the oval so the far turn is never off the edge
   g.receiveShadow = true;
@@ -844,7 +997,7 @@ function buildOvalTrack(){
   bcx.fillText('FINISH',256,50);
   const banTex=new THREE.CanvasTexture(bcv);
   const ban=new THREE.Mesh(new THREE.BoxGeometry(TW+4,2.2,.25),
-    new THREE.MeshBasicMaterial({map:banTex}));
+    new THREE.MeshBasicMaterial({map:srgbTex(banTex),toneMapped:false}));
   ban.position.set(fp.x,8.5,fp.z);
   ban.rotation.y=fp.ry;
   scene.add(ban);
@@ -858,7 +1011,7 @@ function buildOvalTrack(){
   }
   const chkTex=new THREE.CanvasTexture(ccv);
   const stripe=new THREE.Mesh(new THREE.BoxGeometry(TW+4,.06,2.2),
-    new THREE.MeshBasicMaterial({map:chkTex}));
+    new THREE.MeshBasicMaterial({map:chkTex,toneMapped:false}));
   stripe.rotation.y=fp.ry;
   stripe.position.set(fp.x,.04,fp.z);
   scene.add(stripe);
@@ -975,7 +1128,7 @@ function buildGrandstand(){
   c.fillText('★  THE REINDEER DASH  ★', 512, 68);
   const tex=new THREE.CanvasTexture(cv);
   tex.wrapS=THREE.RepeatWrapping; tex.repeat.set(Math.round(len/45),1);
-  const ban=new THREE.Mesh(new THREE.PlaneGeometry(len,3.2), new THREE.MeshBasicMaterial({map:tex}));
+  const ban=new THREE.Mesh(new THREE.PlaneGeometry(len,3.2), new THREE.MeshBasicMaterial({map:srgbTex(tex),toneMapped:false}));
   ban.rotation.y=-Math.PI/2;                 // face the track (−x)
   ban.position.set(backX-.02, topH+2.6, zc); scene.add(ban);
   // End walls follow the rake of the tiers, a handrail's height above them
@@ -1013,7 +1166,7 @@ function buildGrandstand(){
     p.list.forEach((q,i)=>{
       m4.makeTranslation(q.x, q.y+p.dy, q.z);
       mesh.setMatrixAt(i, m4);
-      mesh.setColorAt(i, col.setHex(p.col()));
+      mesh.setColorAt(i, col.setHex(p.col()).convertSRGBToLinear());
       ph[i]=q.ph;
     });
     geo.setAttribute('aPhase', new THREE.InstancedBufferAttribute(ph,1));
@@ -1069,7 +1222,7 @@ function buildStartingGate(){
   sc.fillText('The Reindeer Race', 512, 86);
   const SH=W*160/1024, SY=H+4.3+SH/2;   // clear of the name tags
   const sign=new THREE.Mesh(new THREE.BoxGeometry(W,SH,0.15),
-    new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(scv)}));
+    new THREE.MeshBasicMaterial({map:srgbTex(new THREE.CanvasTexture(scv)),toneMapped:false}));
   sign.position.y=SY; gateGroup.add(sign);
   // Uprights sit BEHIND the sign (−z, away from the head-on gate camera, which
   // looks back from the finish side) so the sign face isn't crossed by posts
@@ -1166,7 +1319,7 @@ function buildSnow(){
   grad.addColorStop(1,'rgba(255,255,255,0)');
   c2.fillStyle=grad; c2.fillRect(0,0,32,32);
   const mat=new THREE.PointsMaterial({size:0.9,map:new THREE.CanvasTexture(cv),
-    color:0xffffff,transparent:true,opacity:.9,depthWrite:false,sizeAttenuation:true});
+    color:0xffffff,transparent:true,opacity:.9,depthWrite:false,sizeAttenuation:true,toneMapped:false});
   snowPts=new THREE.Points(geo,mat);
   snowPts.frustumCulled=false;
   snowPts.visible=false;
@@ -1332,7 +1485,7 @@ function setupDeer(deerScene, runClip, idleClip, idx){
   });
 
   // Elf
-  const elf=makeElf(ELF_COLORS[idx]);
+  const elf=makeElf(ELF_COLORS[idx]); linearize(elf);
   // Saddle cloth in silk colour under the elf
   const cloth=new THREE.Mesh(
     new THREE.BoxGeometry(.55,.06,.85),
@@ -1517,6 +1670,7 @@ function buildGrinch(){
   pom.position.set(.38,2.95,0); g.add(pom);
   g.scale.setScalar(1.35);
   g.visible=false;
+  linearize(g);
   scene.add(g);
   // Name tag — same canvas-sprite style as the deer
   const tag=makeTag('The Grinch', '#2f9e44', '#fff'); tag.visible=false;
@@ -1546,7 +1700,7 @@ function initSparkles(){
   c2.fillStyle=grad; c2.fillRect(0,0,64,64);
   const tex=new THREE.CanvasTexture(cv);
   const mat=new THREE.PointsMaterial({size:2.8,map:tex,vertexColors:true,transparent:true,
-    opacity:.95,blending:THREE.NormalBlending,depthWrite:false,sizeAttenuation:true});
+    opacity:.95,blending:THREE.NormalBlending,depthWrite:false,sizeAttenuation:true,toneMapped:false});
   sparkPts=new THREE.Points(geo,mat);
   sparkPts.frustumCulled=false;
   scene.add(sparkPts);
@@ -1668,7 +1822,7 @@ function makeTag(text, bg, fg){
   c.fillStyle=bg; c.beginPath(); c.roundRect(4,4,cv.width-8,cv.height-8,40); c.fill();
   c.fillStyle=fg; c.font=font; c.textAlign='center'; c.textBaseline='middle';
   c.fillText(text, cv.width/2, cv.height/2+3);
-  const tag=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),depthTest:false,transparent:true,opacity:.95}));
+  const tag=new THREE.Sprite(new THREE.SpriteMaterial({map:srgbTex(new THREE.CanvasTexture(cv)),toneMapped:false,depthTest:false,transparent:true,opacity:.95}));
   tag.userData.aspect=cv.width/cv.height;
   tag.scale.set(tag.userData.aspect, 1, 1);
   scene.add(tag);
@@ -1759,7 +1913,7 @@ function capturePhotoFinish(d){
   // Hide everything that could block the lens: gantry poles + entire fence
   finishPoles.forEach(p=>p.visible=false);
   if(fenceGroup) fenceGroup.visible=false;
-  renderer.render(scene, camera);
+  render();
   const img=renderer.domElement.toDataURL('image/jpeg', 0.7);
   finishPoles.forEach(p=>p.visible=true);
   if(fenceGroup) fenceGroup.visible=true;
@@ -2506,7 +2660,7 @@ function showResults(){
   document.getElementById('winIntBtn').addEventListener('click', ()=>startShow('win'));
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.19.1</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.20.0</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
@@ -2826,7 +2980,7 @@ function buildReporter(){
   const c=cv.getContext('2d'); c.fillStyle='#c8102e'; c.fillRect(0,0,128,64);
   c.fillStyle='#fff'; c.font='bold 40px sans-serif'; c.textAlign='center'; c.textBaseline='middle'; c.fillText('NPN',64,34);
   const flag=new THREE.Mesh(new THREE.BoxGeometry(.13,.07,.13),
-    [1,2,3,4,5,6].map(()=>new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(cv)})));
+    [1,2,3,4,5,6].map(()=>new THREE.MeshBasicMaterial({map:srgbTex(new THREE.CanvasTexture(cv)),toneMapped:false})));
   flag.position.y=.15; mic.add(flag);
   const head=new THREE.Group(); head.position.y=1.78; g.add(head);
   head.add(new THREE.Mesh(new THREE.SphereGeometry(.16,14,12),skin));
@@ -2947,7 +3101,7 @@ function startShow(kind){
   // The race lighting is tuned for side-lit runners; front-on to the camera it
   // washes everyone out to pastels — soften it for the studio-style shots
   intro.light=[hemiLight.intensity, sunLight.intensity];
-  hemiLight.intensity=0.55; sunLight.intensity=0.85;
+  hemiLight.intensity*=0.6; sunLight.intensity*=0.65;
   intro.santa.visible=intro.adam.visible=true;
   deerObjs.forEach(d=>{ if(d&&d.tag) d.tag.visible=false; });
   overlay.classList.add('off'); camBar.style.display='none';
@@ -3118,9 +3272,9 @@ function animate(){
   updateSnow(rawDt);
   crowdUpdate();
   updateStandCrowd(rawDt);
-  if(intro.active){ updateIntro(rawDt); renderer.render(scene, camera); return; }
-  if(replayActive){ updateReplay(rawDt); renderer.render(scene, camera); return; }
-  if(paused && racing){ renderer.render(scene, camera); return; }
+  if(intro.active){ updateIntro(rawDt); render(); return; }
+  if(replayActive){ updateReplay(rawDt); render(); return; }
+  if(paused && racing){ render(); return; }
   if(racing) updateRace(dt);
   else if(preRace){
     // Gate lineup — idle animation plays, elves stay seated, tags track
@@ -3129,7 +3283,7 @@ function animate(){
   }
   updateGateDoors(dt);
   if(calActive) updateCalCamera(); else directCamera(dt);
-  renderer.render(scene, camera);
+  render();
 }
 
 init();

@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.19.1 (version string appears in exactly 4 places —
+- **Current version:** v8.20.0 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -231,7 +231,32 @@ Changing STR/TR requires auditing every camera position and camera.far.
   renderer termination") — pre-existing, not the crowd. Use a fixed-vantage
   `__VIEW` override in the test page to inspect the stand.
 
+## Look / rendering (v8.20.0 — Tom: "overall cheap look on PC browser")
+- ACES filmic tone mapping (`LOOK_EXPOSURE`), gradient sky dome that follows
+  the camera, and a PMREM environment map from a LINEAR copy of the sky
+  (`LOOK_ENV` dims it) so PBR surfaces get sky fill + reflections. Light
+  levels: `LOOK_HEMI`, `LOOK_SUN` — all at the top of the LOOK section.
+- `linearize(root)` converts authored sRGB hex colours to linear once
+  (flag `userData.lin`). Applied to the world at the end of init, elves, the
+  Grinch; crowd instance colours convert in place. Santa/Adam already used
+  linear colours. Canvas textures (signs, tags, banners) use `srgbTex()` +
+  `toneMapped:false` so text stays crisp and saturated.
+- Shadows follow the camera (`sunFollow`, called from `render()`): a 2048 map
+  sized to what the camera looks at (22–130m half-width, texel-snapped).
+  Always render through `render()`, never `renderer.render` directly.
+- Ground: noise canvas textures (dirt outside, grass infield as ONE stadium
+  `ShapeGeometry`), plus a racing-surface ribbon with harrow lines along the
+  track (`buildTrackSurface`, y=0.05). polygonOffset on dirt (4) and infield
+  (2): from high cameras the infield otherwise lost the depth fight.
+- NOT done yet (stage 4, offered): post-processing — bloom, depth of field on
+  tight shots, motion blur, grade/vignette — PC only.
+
 ## Three.js r128 gotchas
+- Fog is mixed AFTER tone mapping + sRGB encoding, so `scene.fog` colour is a
+  DISPLAY colour. The sky dome writes display colours (no tone mapping) so its
+  horizon matches the fog exactly
+- PMREM `fromScene` renders into an RGBE target: a ShaderMaterial drawn into it
+  must `#include <encodings_fragment>` or every lit surface goes black
 - 9 cache-busted model loads (`scene.gltf?n=0..8`) or all deer share one
   skeleton; SkeletonUtils.clone per deer
 - normalizeClip() shifts Rundeer keyframes to t=0 or animation never starts
