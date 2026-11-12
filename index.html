@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v8.21.0</title>
+<title>Reindeer Dash v8.21.1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -109,7 +109,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.21.0</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.21.1</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -161,7 +161,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v8.21.0';
+const VERSION='v8.21.1';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#b0503a'];   // deer coat tints (sRGB); Rudolph a red-brown so his nose stands out
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -771,7 +771,7 @@ function render(cam=camera, post=true){
   else { renderer.setRenderTarget(null); renderer.render(scene, cam); }
 }
 
-// ── POST FX (v8.21.0) — PC only ─────────────────────────────────────────────
+// ── POST FX (v8.21) — PC only ─────────────────────────────────────────────
 // The scene renders into an off-screen target that is tone-mapped AND
 // sRGB-encoded exactly like the screen (r128 applies both to render targets),
 // so every pass works on the final picture: FXAA (the target has no MSAA),
@@ -1049,7 +1049,7 @@ function buildGround(){
   scene.add(g);
 }
 
-// Merge a group's static meshes into ONE mesh per material (v8.21.0). The fence
+// Merge a group's static meshes into ONE mesh per material (v8.21). The fence
 // alone was ~4,000 meshes (13 per candy cane) and the curbs 800 — ~1,300 draw
 // calls a frame, which made the game CPU-bound (~20ms/frame) even on a fast PC.
 function mergeByMaterial(group){
@@ -1665,7 +1665,7 @@ function setupDeer(deerScene, runClip, idleClip, idx){
   deerScene.scale.setScalar(deerScale);
 
   // Colour tint
-  // Tints are sRGB hex - convert, or the tans wash out to cream (v8.21.0)
+  // Tints are sRGB hex - convert, or the tans wash out to cream (v8.21)
   const tint=new THREE.Color(COLORS[idx]).convertSRGBToLinear();
   deerScene.traverse(n=>{
     if(!n.isMesh) return;
@@ -2876,7 +2876,7 @@ function showResults(){
   document.getElementById('winIntBtn').addEventListener('click', ()=>startShow('win'));
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.21.0</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.21.1</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
