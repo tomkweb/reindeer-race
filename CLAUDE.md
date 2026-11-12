@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.20.0 (version string appears in exactly 4 places —
+- **Current version:** v8.21.0 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -248,13 +248,29 @@ Changing STR/TR requires auditing every camera position and camera.far.
   `ShapeGeometry`), plus a racing-surface ribbon with harrow lines along the
   track (`buildTrackSurface`, y=0.05). polygonOffset on dirt (4) and infield
   (2): from high cameras the infield otherwise lost the depth fight.
-- NOT done yet (stage 4, offered): post-processing — bloom, depth of field on
-  tight shots, motion blur, grade/vignette — PC only.
+- Post FX (v8.21.0, `fxRender`): scene renders into an off-screen target that
+  r128 tone-maps AND sRGB-encodes like the screen, then FXAA, camera motion
+  blur (depth reprojection; skipped across cuts; pixels near the focus plane
+  stay sharp because the camera tracks the runners), depth of field when
+  FOV < 36° (focus = `camAim`, or `FX.aim` = the speaker in interviews), bloom
+  on near-white highlights, light grade + vignette + grain. On unless the
+  pointer is coarse (phones); `?fx=0`/`?fx=1` force it (`1` also disables the
+  auto-off: two 3s race windows under 40 fps turn it off). Name tags are on
+  LAYER 1 and drawn after the composite (crisp, never blurred) — the camera
+  sees layers 0+1; the photo finish renders plain (`render(camera,false)`).
+- Perf (Tom's PC, RTX 5060 Ti, 1874x922): the game was CPU-bound, ~20ms/frame
+  of JS+draw submission. `mergeByMaterial()` folds the fence (~4,000 meshes)
+  and curbs (800) into one mesh per material: 11ms/frame, ~55-60 fps WITH FX.
+  Measure with a rAF wrapper (time each callback) + a WebGL drawElements count.
+- Deer coat tints (`COLORS`) are sRGB and converted (v8.21.0) — raw they read
+  cream. Rudolph is '#b0503a' red-brown (pure red read neon once converted).
 
 ## Three.js r128 gotchas
 - Fog is mixed AFTER tone mapping + sRGB encoding, so `scene.fog` colour is a
   DISPLAY colour. The sky dome writes display colours (no tone mapping) so its
   horizon matches the fog exactly
+- r128 applies tone mapping AND output encoding to render targets too (encoding
+  from the target's texture) — later versions don't; don't port FX blindly
 - PMREM `fromScene` renders into an RGBE target: a ShaderMaterial drawn into it
   must `#include <encodings_fragment>` or every lit surface goes black
 - 9 cache-busted model loads (`scene.gltf?n=0..8`) or all deer share one
@@ -296,7 +312,8 @@ main script block with node vm before every delivery.
 - Closer win-rate knob: `dramaCloserWins = Math.random() < 0.80`
 - Better deer model (Rifat3D, Sketchfab, needs PC purchase)
 - Real-phone listen to the interview voices (Android accents/pitches)
-- Real-phone check of the grandstand's frame rate (~100k extra tris)
+- Real-phone check of the grandstand's frame rate (~100k extra tris), and of
+  v8.20's 2048 following shadow map (phones get no post FX)
 - Sound: hoofbeats, Grinch sting still to do. Crowd noise (v8.7.0) uses
   real recordings in `audio/` — a synthesized noise crowd (v8.6.0) sounded
   like static and was dropped. Two loops (`bed` ambience, `excited` chatter)

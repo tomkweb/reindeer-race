@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v8.20.0</title>
+<title>Reindeer Dash v8.21.0</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -109,7 +109,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.20.0</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.21.0</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -161,9 +161,9 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v8.20.0';
+const VERSION='v8.21.0';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
-const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#e03020'];
+const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#b0503a'];   // deer coat tints (sRGB); Rudolph a red-brown so his nose stands out
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
 const SILKS=['#e53935','#1e88e5','#43a047','#fdd835','#8e24aa','#fb8c00','#00acc1','#ec407a','#f5f5f5'];
 const ELF_COLORS=SILKS;
@@ -764,10 +764,171 @@ function sunFollow(cam){
     sc.left=-half; sc.right=half; sc.top=half; sc.bottom=-half; sc.updateProjectionMatrix();
   }
 }
-function render(cam=camera){
+function render(cam=camera, post=true){
   if(skyDome) skyDome.position.copy(cam.position);
   sunFollow(cam);
-  renderer.render(scene, cam);
+  if(post && FX.on) fxRender(cam);
+  else { renderer.setRenderTarget(null); renderer.render(scene, cam); }
+}
+
+// ── POST FX (v8.21.0) — PC only ─────────────────────────────────────────────
+// The scene renders into an off-screen target that is tone-mapped AND
+// sRGB-encoded exactly like the screen (r128 applies both to render targets),
+// so every pass works on the final picture: FXAA (the target has no MSAA),
+// camera motion blur (depth reprojection with last frame's view-projection),
+// depth of field on long-lens/close shots (focus = the camera's aim point),
+// bloom on the brightest highlights, a light grade, vignette and grain.
+// On by default unless the pointer is coarse (phones/tablets); ?fx=0 / ?fx=1
+// force it. Switches itself off if the frame rate sags below ~38 fps.
+const FX={on:false, aim:null, focus:20, prevVP:new THREE.Matrix4(), vp:new THREE.Matrix4(),
+  prevPos:new THREE.Vector3(), prevQ:new THREE.Quaternion(), fw:new THREE.Vector3(),
+  first:true, force:false, slow:0, winT:0, winN:0};
+function fxWanted(){
+  const q=new URLSearchParams(location.search).get('fx');
+  if(q==='0') return false; if(q==='1'){ FX.force=true; return true; }
+  return !matchMedia('(pointer:coarse)').matches;
+}
+const FX_VS=`varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.0,1.0); }`;
+function fxMat(fs, uniforms){
+  return new THREE.ShaderMaterial({vertexShader:FX_VS, fragmentShader:fs, uniforms,
+    depthTest:false, depthWrite:false, toneMapped:false});
+}
+function fxInit(){
+  const mk=()=>new THREE.WebGLRenderTarget(1,1,{minFilter:THREE.LinearFilter,
+    magFilter:THREE.LinearFilter, depthBuffer:false});
+  FX.rt=new THREE.WebGLRenderTarget(1,1,{minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter});
+  FX.rt.texture.encoding=THREE.sRGBEncoding;           // scene shaders encode to display colours
+  FX.rt.depthTexture=new THREE.DepthTexture(1,1); FX.rt.depthTexture.type=THREE.UnsignedIntType;
+  FX.h1=mk(); FX.h2=mk(); FX.q1=mk(); FX.q2=mk();
+  FX.scene=new THREE.Scene(); FX.cam=new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+  FX.quad=new THREE.Mesh(new THREE.PlaneGeometry(2,2)); FX.quad.frustumCulled=false; FX.scene.add(FX.quad);
+  FX.down=fxMat(`uniform sampler2D src; uniform vec2 px; varying vec2 vUv;
+    void main(){ gl_FragColor=0.25*(texture2D(src,vUv+px*vec2(-.5,-.5))+texture2D(src,vUv+px*vec2(.5,-.5))
+      +texture2D(src,vUv+px*vec2(-.5,.5))+texture2D(src,vUv+px*vec2(.5,.5))); }`,
+    {src:{value:null}, px:{value:new THREE.Vector2()}});
+  FX.bright=fxMat(`uniform sampler2D src; uniform vec2 px; varying vec2 vUv;
+    void main(){ vec3 c=(texture2D(src,vUv+px*vec2(-1.,-1.)).rgb+texture2D(src,vUv+px*vec2(1.,-1.)).rgb
+      +texture2D(src,vUv+px*vec2(-1.,1.)).rgb+texture2D(src,vUv+px*vec2(1.,1.)).rgb)*0.25;
+      float b=max(c.r,max(c.g,c.b));
+      gl_FragColor=vec4(c*smoothstep(0.86,1.0,b),1.0); }`,
+    {src:{value:null}, px:{value:new THREE.Vector2()}});
+  FX.blur=fxMat(`uniform sampler2D src; uniform vec2 dir; varying vec2 vUv;
+    void main(){ vec4 c=texture2D(src,vUv)*0.227027;
+      c+=(texture2D(src,vUv+dir*1.3846)+texture2D(src,vUv-dir*1.3846))*0.316216;
+      c+=(texture2D(src,vUv+dir*3.2308)+texture2D(src,vUv-dir*3.2308))*0.070270;
+      gl_FragColor=c; }`,
+    {src:{value:null}, dir:{value:new THREE.Vector2()}});
+  FX.comp=fxMat(`#include <packing>
+    uniform sampler2D tCol, tDep, tSoft, tBloom; uniform vec2 px; uniform float near, far, focus,
+      dof, mb, bloom, time; uniform mat4 invVP, prevVP; varying vec2 vUv;
+    const vec3 LU=vec3(0.299,0.587,0.114);
+    vec3 fxaa(vec2 uv){
+      vec3 nw=texture2D(tCol,uv+vec2(-1.,-1.)*px).rgb, ne=texture2D(tCol,uv+vec2(1.,-1.)*px).rgb,
+           sw=texture2D(tCol,uv+vec2(-1.,1.)*px).rgb,  se=texture2D(tCol,uv+vec2(1.,1.)*px).rgb,
+           m=texture2D(tCol,uv).rgb;
+      float lnw=dot(nw,LU), lne=dot(ne,LU), lsw=dot(sw,LU), lse=dot(se,LU), lm=dot(m,LU);
+      float lmin=min(lm,min(min(lnw,lne),min(lsw,lse))), lmax=max(lm,max(max(lnw,lne),max(lsw,lse)));
+      vec2 d=vec2(-((lnw+lne)-(lsw+lse)), (lnw+lsw)-(lne+lse));
+      float red=max((lnw+lne+lsw+lse)*0.03125, 1.0/128.0);
+      d=clamp(d/(min(abs(d.x),abs(d.y))+red),-8.0,8.0)*px;
+      vec3 a=0.5*(texture2D(tCol,uv-d/6.0).rgb+texture2D(tCol,uv+d/6.0).rgb);
+      vec3 b=a*0.5+0.25*(texture2D(tCol,uv-d*0.5).rgb+texture2D(tCol,uv+d*0.5).rgb);
+      float lb=dot(b,LU); return (lb<lmin||lb>lmax)?a:b;
+    }
+    float hash(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453); }
+    void main(){
+      float d=texture2D(tDep,vUv).x;
+      vec3 c=fxaa(vUv);
+      // Camera motion blur: where was this pixel on screen last frame?
+      vec4 w=invVP*vec4(vUv*2.0-1.0, d*2.0-1.0, 1.0); w/=w.w;
+      vec4 p=prevVP*w; vec2 v=(vUv-(p.xy/p.w*0.5+0.5))*mb;
+      // The camera tracks the runners, so things near the focus plane are NOT
+      // moving on screen even though reprojection says so - keep them sharp
+      float zz=-perspectiveDepthToViewZ(d,near,far);
+      v*=smoothstep(0.08,0.4,abs(1.0-focus/zz));
+      float vl=length(v); if(vl>0.035) v*=0.035/vl;
+      if(vl>0.0012){ vec3 acc=c;
+        for(int i=1;i<8;i++){ acc+=texture2D(tCol,vUv+v*(float(i)/7.0-0.5)).rgb; }
+        c=acc/8.0; }
+      // Depth of field: circle of confusion from distance to the focus plane
+      float z=-perspectiveDepthToViewZ(d,near,far);
+      float coc=dof*clamp(abs(1.0-focus/z)*1.8,0.0,1.0);
+      c=mix(c,texture2D(tSoft,vUv).rgb,coc);
+      c+=texture2D(tBloom,vUv).rgb*bloom;
+      // Grade: a touch more saturation + contrast, warm highlights, vignette, grain
+      float l=dot(c,LU); c=mix(vec3(l),c,1.08); c=(c-0.5)*1.05+0.5;
+      c*=mix(vec3(1.0),vec3(1.03,1.0,0.96),smoothstep(0.4,1.0,l));
+      vec2 q=vUv-0.5; c*=mix(0.84,1.0,smoothstep(0.75,0.25,length(q*vec2(1.0,0.85))));
+      c+=(hash(vUv*1000.0+time)-0.5)*0.018;
+      gl_FragColor=vec4(clamp(c,0.0,1.0),1.0);
+    }`,
+    {tCol:{value:null}, tDep:{value:null}, tSoft:{value:null}, tBloom:{value:null},
+     px:{value:new THREE.Vector2()}, near:{value:.1}, far:{value:1000}, focus:{value:20},
+     dof:{value:0}, mb:{value:.5}, bloom:{value:.35}, time:{value:0},
+     invVP:{value:new THREE.Matrix4()}, prevVP:{value:new THREE.Matrix4()}});
+  FX.on=true; fxResize();
+}
+function fxResize(){
+  if(!FX.rt) return;
+  const v=renderer.getDrawingBufferSize(new THREE.Vector2()), w=v.x, h=v.y;
+  FX.rt.setSize(w,h);
+  const hw=Math.max(1,w>>1), hh=Math.max(1,h>>1), qw=Math.max(1,w>>2), qh=Math.max(1,h>>2);
+  FX.h1.setSize(hw,hh); FX.h2.setSize(hw,hh); FX.q1.setSize(qw,qh); FX.q2.setSize(qw,qh);
+  FX.w=w; FX.h=h;
+}
+function fxPass(mat, target){ FX.quad.material=mat; renderer.setRenderTarget(target); renderer.render(FX.scene, FX.cam); }
+function fxRender(cam){
+  // Self-check during races: average fps over 3s windows; two windows in a
+  // row under 40 fps switches the effects off (loading hitches don't count)
+  const now=performance.now();
+  if(racing && !paused && !FX.force){
+    if(!FX.winT) { FX.winT=now; FX.winN=0; }
+    FX.winN++;
+    if(now-FX.winT>3000){
+      const fps=FX.winN*1000/(now-FX.winT); FX.winT=now; FX.winN=0;
+      FX.slow = fps<40 ? FX.slow+1 : 0;
+      if(FX.slow>=2){ FX.on=false; console.log('[fx] '+fps.toFixed(0)+' fps - post effects off'); }
+    }
+  } else FX.winT=0;
+  cam.layers.set(0);                               // scene without the name tags
+  renderer.setRenderTarget(FX.rt); renderer.render(scene, cam);
+  cam.layers.enable(1);
+  // Soft copy (half res) for depth of field
+  FX.down.uniforms.src.value=FX.rt.texture; FX.down.uniforms.px.value.set(1/FX.w,1/FX.h); fxPass(FX.down,FX.h1);
+  const b=FX.blur.uniforms;
+  b.src.value=FX.h1.texture; b.dir.value.set(1.6/FX.h1.width,0); fxPass(FX.blur,FX.h2);
+  b.src.value=FX.h2.texture; b.dir.value.set(0,1.6/FX.h1.height); fxPass(FX.blur,FX.h1);
+  // Bloom (quarter res, two blur rounds)
+  FX.bright.uniforms.src.value=FX.rt.texture; FX.bright.uniforms.px.value.set(1/FX.w,1/FX.h); fxPass(FX.bright,FX.q1);
+  for(let i=0;i<2;i++){
+    b.src.value=FX.q1.texture; b.dir.value.set((1+i)/FX.q1.width,0); fxPass(FX.blur,FX.q2);
+    b.src.value=FX.q2.texture; b.dir.value.set(0,(1+i)/FX.q1.height); fxPass(FX.blur,FX.q1);
+  }
+  // Camera cut? (big jump in position or angle) - no blur smear across a cut
+  cam.updateMatrixWorld();
+  FX.vp.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
+  const cut = FX.first || cam.position.distanceTo(FX.prevPos)>6 || cam.quaternion.angleTo(FX.prevQ)>0.3;
+  if(cut) FX.prevVP.copy(FX.vp);
+  // Focus: the point the shot is aimed at (interview: the speaker)
+  const aim=(intro.active&&FX.aim)?FX.aim:camAim;
+  cam.getWorldDirection(FX.fw);
+  const fz=Math.max(2, FX.fw.dot(aim.clone().sub(cam.position)));
+  FX.focus = cut ? fz : FX.focus+(fz-FX.focus)*0.15;
+  const u=FX.comp.uniforms;
+  u.tCol.value=FX.rt.texture; u.tDep.value=FX.rt.depthTexture; u.tSoft.value=FX.h1.texture; u.tBloom.value=FX.q1.texture;
+  u.px.value.set(1/FX.w,1/FX.h); u.near.value=cam.near; u.far.value=cam.far; u.focus.value=FX.focus;
+  // Shallow focus only on long lenses and close-ups (narrow FOV)
+  u.dof.value=Math.min(1,Math.max(0,(36-cam.fov)/18))*0.85;
+  u.invVP.value.copy(FX.vp).invert(); u.prevVP.value.copy(FX.prevVP);
+  u.time.value=(now%10000)/1000;
+  fxPass(FX.comp,null);
+  // Name tags (layer 1) go on top, after the effects: always crisp, never blurred
+  const au=renderer.autoClear, su=renderer.shadowMap.autoUpdate;
+  renderer.autoClear=false; renderer.shadowMap.autoUpdate=false;
+  cam.layers.set(1); renderer.render(scene, cam);
+  renderer.autoClear=au; renderer.shadowMap.autoUpdate=su;
+  cam.layers.enable(0);
+  FX.prevVP.copy(FX.vp); FX.prevPos.copy(cam.position); FX.prevQ.copy(cam.quaternion); FX.first=false;
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
@@ -776,6 +937,7 @@ function init(){
   scene.fog = new THREE.Fog(SKY.hor, 140, 620);   // display colour (see buildSky)
 
   camera = new THREE.PerspectiveCamera(54, innerWidth/innerHeight, 0.1, 1200);
+  camera.layers.enable(1);   // layer 1 = name tags (see fxRender)
   camera.position.copy(camPos);
 
   renderer = new THREE.WebGLRenderer({antialias: true});
@@ -863,7 +1025,9 @@ function init(){
     camera.aspect = innerWidth/innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
+    fxResize();
   });
+  if(fxWanted()) fxInit();
   linearize(scene);   // world built so far: track, gate, stand, finish (deer load async)
   animate();
 }
@@ -885,6 +1049,53 @@ function buildGround(){
   scene.add(g);
 }
 
+// Merge a group's static meshes into ONE mesh per material (v8.21.0). The fence
+// alone was ~4,000 meshes (13 per candy cane) and the curbs 800 — ~1,300 draw
+// calls a frame, which made the game CPU-bound (~20ms/frame) even on a fast PC.
+function mergeByMaterial(group){
+  group.updateMatrixWorld(true);
+  const inv=new THREE.Matrix4().copy(group.matrixWorld).invert();
+  const buckets=new Map(), olds=[];
+  group.traverse(n=>{
+    if(!n.isMesh) return;
+    olds.push(n);
+    if(!buckets.has(n.material)) buckets.set(n.material,[]);
+    buckets.get(n.material).push(n);
+  });
+  olds.forEach(n=>n.parent.remove(n));
+  [...group.children].forEach(c=>group.remove(c));   // emptied sub-groups (canes)
+  const nm=new THREE.Matrix3(), m=new THREE.Matrix4();
+  buckets.forEach((meshes,mat)=>{
+    let nv=0, ni=0;
+    meshes.forEach(o=>{ nv+=o.geometry.attributes.position.count; ni+=o.geometry.index?o.geometry.index.count:o.geometry.attributes.position.count; });
+    const pos=new Float32Array(nv*3), nor=new Float32Array(nv*3), uv=new Float32Array(nv*2);
+    const idx=new Uint32Array(ni); let vo=0, io=0;
+    const v=new THREE.Vector3();
+    meshes.forEach(o=>{
+      const g=o.geometry, P=g.attributes.position, N=g.attributes.normal, U=g.attributes.uv;
+      m.multiplyMatrices(inv,o.matrixWorld); nm.getNormalMatrix(m);
+      for(let i=0;i<P.count;i++){
+        v.fromBufferAttribute(P,i).applyMatrix4(m); pos.set([v.x,v.y,v.z],(vo+i)*3);
+        if(N){ v.fromBufferAttribute(N,i).applyMatrix3(nm).normalize(); nor.set([v.x,v.y,v.z],(vo+i)*3); }
+        if(U){ uv[(vo+i)*2]=U.getX(i); uv[(vo+i)*2+1]=U.getY(i); }
+      }
+      if(g.index){ for(let i=0;i<g.index.count;i++) idx[io+i]=g.index.getX(i)+vo; io+=g.index.count; }
+      else { for(let i=0;i<P.count;i++) idx[io+i]=vo+i; io+=P.count; }
+      vo+=P.count;
+      g.dispose();
+    });
+    const geo=new THREE.BufferGeometry();
+    geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+    geo.setAttribute('normal',new THREE.BufferAttribute(nor,3));
+    geo.setAttribute('uv',new THREE.BufferAttribute(uv,2));
+    geo.setIndex(new THREE.BufferAttribute(idx,1));
+    geo.computeBoundingSphere();
+    const mesh=new THREE.Mesh(geo,mat);
+    mesh.castShadow=meshes[0].castShadow; mesh.receiveShadow=meshes[0].receiveShadow;
+    group.add(mesh);
+  });
+}
+
 // ── OVAL TRACK VISUAL ─────────────────────────────────────────────────────────
 function buildOvalTrack(){
   fenceGroup = new THREE.Group();  // all posts + rails — hidden during photo-finish capture
@@ -898,6 +1109,7 @@ function buildOvalTrack(){
   const nPosts = 160;
 
   // CURB STRIPS — wide flat white bands at ground level, clearly visible overhead
+  const curbGroup=new THREE.Group(); scene.add(curbGroup);
   for(let i=0;i<nCurb;i++){
     const u0=i/nCurb, u1=(i+1)/nCurb;
     [-hw, hw].forEach(off=>{
@@ -908,7 +1120,7 @@ function buildOvalTrack(){
       const curb=new THREE.Mesh(new THREE.BoxGeometry(len,.15,3.0),curbMat);
       curb.position.set(mx,.06,mz);
       curb.rotation.y=-Math.atan2(dz,dx);
-      scene.add(curb);
+      curbGroup.add(curb);
     });
   }
 
@@ -963,6 +1175,8 @@ function buildOvalTrack(){
       });
     });
   }
+  mergeByMaterial(curbGroup);
+  mergeByMaterial(fenceGroup);
 
   // Finish line gantry at progress=0
   const fp=trackPos(0,0);
@@ -1451,7 +1665,8 @@ function setupDeer(deerScene, runClip, idleClip, idx){
   deerScene.scale.setScalar(deerScale);
 
   // Colour tint
-  const tint=new THREE.Color(COLORS[idx]);
+  // Tints are sRGB hex - convert, or the tans wash out to cream (v8.21.0)
+  const tint=new THREE.Color(COLORS[idx]).convertSRGBToLinear();
   deerScene.traverse(n=>{
     if(!n.isMesh) return;
     const orig=Array.isArray(n.material)?n.material[0]:n.material;
@@ -1825,6 +2040,7 @@ function makeTag(text, bg, fg){
   const tag=new THREE.Sprite(new THREE.SpriteMaterial({map:srgbTex(new THREE.CanvasTexture(cv)),toneMapped:false,depthTest:false,transparent:true,opacity:.95}));
   tag.userData.aspect=cv.width/cv.height;
   tag.scale.set(tag.userData.aspect, 1, 1);
+  tag.layers.set(1);            // overlay layer: drawn after post FX (camera sees layers 0+1)
   scene.add(tag);
   return tag;
 }
@@ -1913,7 +2129,7 @@ function capturePhotoFinish(d){
   // Hide everything that could block the lens: gantry poles + entire fence
   finishPoles.forEach(p=>p.visible=false);
   if(fenceGroup) fenceGroup.visible=false;
-  render();
+  render(camera,false);   // plain render: the post targets are screen-sized
   const img=renderer.domElement.toDataURL('image/jpeg', 0.7);
   finishPoles.forEach(p=>p.visible=true);
   if(fenceGroup) fenceGroup.visible=true;
@@ -2660,7 +2876,7 @@ function showResults(){
   document.getElementById('winIntBtn').addEventListener('click', ()=>startShow('win'));
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.20.0</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.21.0</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
@@ -3255,6 +3471,7 @@ function updateIntro(dt){
   const elfShot = !isG && (intro.shot==='elf' || intro.shot==='two_elf');   // antler-dodging angle is for the jockey only
   camera.position.set(X-dist, f.cy+(elfShot?1.1:0.4), f.cz+(elfShot&&intro.shot==='elf'?1.8:0));
   camera.lookAt(X, f.cy, f.cz);
+  (FX.aim||(FX.aim=new THREE.Vector3())).set(X, f.cy, f.cz);   // focus on the speaker
   const asp=camera.aspect||1;
   const fov=2*Math.atan(Math.max(f.h*0.56, (f.w*0.56)/asp)/dist)*180/Math.PI;
   if(Math.abs(camera.fov-fov)>0.01){ camera.fov=fov; camera.updateProjectionMatrix(); }
