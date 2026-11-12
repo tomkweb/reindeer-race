@@ -14,7 +14,7 @@ several per evening.
 
 - **Live:** https://tomkweb.github.io/reindeer-race
 - **Repo:** github.com/tomkweb/reindeer-race
-- **Current version:** v8.21.4 (version string appears in exactly 4 places —
+- **Current version:** v8.22.0 (version string appears in exactly 4 places —
   bump all together, verify with `grep -c`)
 
 ## Deployment
@@ -104,7 +104,7 @@ Diagnose speech with Claude in Chrome on the live page: wrap
 button (speech without a user gesture fails `not-allowed`).
 
 ## Camera system (broadcast structure)
-gate head-on (2s hold) → wire cam first pass (frames whole pack, real lens
+gate head-on (2s hold) → wire cam, then infield rail cam, on the first pass (frames whole pack, real lens
 optics: FOV = 2·atan(halfWidth/dist)) → grandstand through turn 1 →
 backstretch crane/telephoto/blimp cuts every 4–6s → head-on far turn →
 wire cam with surge-adaptive zoom (blends aim toward the charging closer)
@@ -136,6 +136,15 @@ wire cam with surge-adaptive zoom (blends aim toward the charging closer)
   rAF barely ticks): telephoto zoom jitter 46→2.8, aim 0.17→0.04; wire zoom
   70→1.7. Telephoto camera now rides OUTSIDE the track (150m off the rail) —
   from its old infield spot the 7-14m infield trees blocked the tight lens
+- Infield rail cam (`railcam`, v8.22.0 — Tom: "add a couple more infield shots
+  so we can see" the grandstand banner): fixed camera just inside the inner
+  rail (x=TR-TW/2-5, 6.3m up, over the canes' hooks), placed midway between
+  fence posts, ahead of the leader, skipping spots inside an infield tree
+  (`INFIELD_TREES`), ≥25m from the line (stand end wall); pans as the field
+  passes, hard-cuts to a new spot once the leaders are 30m past. Auto
+  director: first pass prog 0.11-0.20 (wire before it), stretch 0.895-0.94
+  (wire 0.85-0.895, grandstand after). Only when the leader is ON the
+  straight (`onStraight`), else wire. Homestretch = last 320m = prog > 0.893.
 - Run to the line (grandstand, raceFrac>0.88, v8.13.0): side-on from the
   outside rail framing lead room ahead of the leader back to 3rd place, so
   the leader is on the RIGHT (travel is left→right) with chasers trailing;
@@ -213,7 +222,7 @@ Changing STR/TR requires auditing every camera position and camera.far.
   End walls (v8.19.0) are raked like a handrail — 1.1m above the tiers,
   following their slope — not full back-wall height; `standTopAt` only
   treats the back wall as tall.
-- Starting gate (v8.19.0): "The Reindeer Race" sign on two uprights, its
+- Starting gate (v8.19.0; text "The Reindeer Dash" since v8.22.0 — Tom: match the game name): sign on two uprights, its
   bottom ~7.5m up so the name tags in the gate shot sit below it, not on it.
   Uprights sit 0.2m BEHIND the sign (−z; v8.19.1) so they don't cross its face.
 - ~1,700 spectators = 4 InstancedMeshes (body/head/arms/Santa hats on ~35%),

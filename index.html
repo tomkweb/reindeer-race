@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reindeer Dash v8.21.4</title>
+<title>Reindeer Dash v8.22.0</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -109,7 +109,7 @@ canvas{display:block;}
 
 <div class="overlay" id="overlay">
   <div class="card">
-    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.21.4</small></h1>
+    <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.22.0</small></h1>
     <p class="sub">9 runners &middot; oval track &middot; 1 lap</p>
     <div class="progress"><div class="bar" id="loadBar"></div></div>
     <div id="loadMsg" style="color:#c6d2ec;font-size:.9rem;margin-bottom:1.2rem">Loading... 0/9</div>
@@ -161,7 +161,7 @@ window.onerror=function(msg,src,line){
   return false;
 };
 (function(){
-const VERSION='v8.21.4';
+const VERSION='v8.22.0';
 const NAMES=['Dasher','Dancer','Prancer','Vixen','Comet','Cupid','Donner','Blitzen','Rudolph'];
 const COLORS=['#c47a3a','#b86d45','#d49050','#a05c2e','#c88048','#b07040','#d4a060','#985030','#b0503a'];   // deer coat tints (sRGB); Rudolph a red-brown so his nose stands out
 // Racing silks — one distinct colour per reindeer (elf coat + saddle cloth + name tag + results)
@@ -596,6 +596,8 @@ let replayWasSlow=false;
 let preRace=false, preRaceTimer=0;
 const PRE_RACE_DUR=5.0; // seconds of gate head-on before gates open
 let camMode='auto', autoPick='gate', autoCutTimer=0;
+const railCam={z:null, cut:false}; let lastActiveCam='';   // infield rail cam state
+const INFIELD_TREES=[];   // {x,z,r} of the infield Christmas trees
 let targetFov=54, currentFov=54; // smooth FOV transitions for telephoto effect
 let winnerCamActive=false, winnerCamTimer=0;
 let snowGeo;
@@ -1451,7 +1453,7 @@ function buildStartingGate(){
   sc.fillStyle='#f4c430'; sc.fillRect(0,0,1024,160);
   sc.fillStyle='#b3202a'; sc.fillRect(10,10,1004,140);
   sc.fillStyle='#ffffff'; sc.font='bold 100px sans-serif'; sc.textAlign='center'; sc.textBaseline='middle';
-  sc.fillText('The Reindeer Race', 512, 86);
+  sc.fillText('The Reindeer Dash', 512, 86);
   const SH=W*160/1024, SY=H+4.3+SH/2;   // clear of the name tags
   const sign=new THREE.Mesh(new THREE.BoxGeometry(W,SH,0.15),
     new THREE.MeshBasicMaterial({map:srgbTex(new THREE.CanvasTexture(scv)),toneMapped:false}));
@@ -1514,6 +1516,7 @@ function buildSnow(){
     const ring=new THREE.Mesh(new THREE.CylinderGeometry(h*.42,h*.42,0.05,12),snowM);
     ring.position.y=0.045; t.add(ring);
     t.position.set(s.x,0.02,s.z);
+    INFIELD_TREES.push({x:s.x, z:s.z, r:h*0.5});   // rail cam keeps clear of these
     t.rotation.y=Math.random()*Math.PI*2;
     scene.add(t);
   }
@@ -2316,7 +2319,7 @@ function packXZ(){
 // Vertical FOV that fits the top 3 runners (plus a landed Grinch) as seen from
 // camera position `from` aimed at `at`: each runner padded by a body length and
 // head-to-hoof height, in the current (often portrait) aspect, +20% margin.
-const FIT_TOP3=new Set(['grandstand','telephoto','headon_low','drone','wire','crane','infield']);
+const FIT_TOP3=new Set(['grandstand','telephoto','headon_low','drone','wire','crane','infield','railcam']);
 // Real-lens fit: the vertical FOV that just contains `positions` (deer, padded
 // by a body length either side and hooves-to-name-tag height) as seen from
 // `from` aimed at `at`, in the CURRENT aspect — portrait phone or landscape
@@ -2633,13 +2636,17 @@ function directCamera(dt){
   if(mode==='auto'){
     const ld=leader();
     const prog=ld ? Math.min(1,(ld.progress-P_GATE)/1.25) : 0;
+    // Rail cam only once the leader is properly on the homestretch (x=+TR straight)
+    const onStraight = ld ? (()=>{ const q=trackPos(ld.progress,0); return q.x>TR-1 && q.z<STR-20; })() : false;
     // Broadcast-style directing — mirrors a real horse-race telecast:
     // few cuts, long continuous pans, telephoto on the backstretch,
     // head-on turning for home, one locked wire cam through the stretch.
     if(raceTime<2){
       autoPick='gate_headon';          // the break — hold the head-on gate shot 2s
+    } else if(prog<0.11){
+      autoPick='wire';                 // out of the turn into the homestretch — wire cam pans
     } else if(prog<0.20){
-      autoPick='wire';                 // first pass down the homestretch — wire cam pans
+      autoPick=onStraight?'railcam':'wire';   // past the stand — infield rail cam, crowd + banner behind
     } else if(prog<0.45){
       autoPick='grandstand';           // through turn 1 into the backstretch
     } else if(prog<0.70){
@@ -2652,8 +2659,10 @@ function directCamera(dt){
       }
     } else if(prog<0.85){
       autoPick='headon_low';           // far turn — field turns for home
-    } else if(prog<0.90){
+    } else if(prog<0.895){
       autoPick='wire';                 // stretch run — zoom tracks the late surge
+    } else if(prog<0.94){
+      autoPick=onStraight?'railcam':'wire';   // the roaring stand behind the drive
     } else {
       autoPick='grandstand';           // halfway to the wire — side view to the line
     }
@@ -2820,6 +2829,31 @@ function directCamera(dt){
     }
     camLabel.innerHTML='<span class="rec">●</span> HOMESTRETCH'; sm=5.0;
 
+  } else if(mode==='railcam'){
+    // INFIELD RAIL CAM (v8.22): fixed camera just inside the inner rail, low,
+    // panning as the field gallops past with the grandstand + banner behind.
+    // It sits between the rail and the infield trees (tree trunks are ≥10m
+    // further in, and it looks outward, so they're behind it). Once the
+    // leaders are 30m past, it cuts to a fresh spot ahead of them.
+    const lf=leadersFrame();
+    const lp=ld?trackPos(ld.progress,0):null;
+    if(lp){
+      if(railCam.z===null || railCam.z-lp.z>30 || lastActiveCam!=='railcam'){
+        // runners travel −z on the homestretch: put the camera ahead of them
+        // Midway between two fence posts (posts every CIRC/160 m; on the
+        // homestretch z = distance along the track) so no candy cane sits
+        // right in front of the lens
+        const sp=CIRC/160, z0=Math.max(25, lp.z-(28+Math.random()*10));   // ≥25m from the line: keeps the stand end wall out of frame
+        railCam.z=(Math.floor(z0/sp)+0.5)*sp; railCam.cut=true;
+        // ...and never inside one of the infield trees (try the next gap back)
+        const cx=TR-TW/2-5;
+        for(let k=0;k<6 && INFIELD_TREES.some(t=>Math.hypot(t.x-cx,t.z-railCam.z)<t.r+1.5);k++) railCam.z-=sp;
+      }
+      tp.set(TR-TW/2-5, 6.3, railCam.z);   // high enough to look over the canes' hooks
+      ta.set(lf.x, 1.8, lf.z);
+    }
+    camLabel.innerHTML='<span class="rec">●</span> INFIELD RAIL'; targetFov=30; sm=6.0;
+
   } else if(mode==='infield'){
     const lf=leadersFrame();
     tp.set(lf.x * 0.3, 1.2, lf.z + 10 + lf.spread*0.4);
@@ -2842,7 +2876,9 @@ function directCamera(dt){
   liftOverStand(tp, ta);
 
   const a=1-Math.exp(-sm*dt);
-  camPos.lerp(tp,a); camAim.lerp(ta,a);
+  if(railCam.cut){ camPos.copy(tp); camAim.copy(ta); currentFov=targetFov; railCam.cut=false; }
+  else { camPos.lerp(tp,a); camAim.lerp(ta,a); }
+  lastActiveCam=mode;
   if(!isFinite(camPos.x)||!isFinite(camPos.y)||!isFinite(camPos.z)){ camPos.copy(tp); }
   if(!isFinite(camAim.x)||!isFinite(camAim.y)||!isFinite(camAim.z)){ camAim.copy(ta); }
   camera.position.copy(camPos);
@@ -2894,7 +2930,7 @@ function showResults(){
   document.getElementById('winIntBtn').addEventListener('click', ()=>startShow('win'));
   document.getElementById('again').addEventListener('click',()=>{
     overlay.innerHTML=`<div class="card">
-      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.21.4</small></h1>
+      <h1>The <span class="g">Reindeer</span> Dash <small style="font-size:.45em;opacity:.7">v8.22.0</small></h1>
       <p class="sub">9 runners &middot; oval track &middot; ${VERSION}</p>
       <button class="bigBtn" id="s2" style="display:block;margin:1.5rem auto 0">Race Again</button>
     </div>`;
